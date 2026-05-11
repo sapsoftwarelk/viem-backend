@@ -35,20 +35,36 @@ model SubCategory {
 }
 
 // ---------------------------------------------------------
-// 2. Users & Roles
+// 2. Employees & System Users & Roles
 // ---------------------------------------------------------
 
+model Employee {
+  id           String   @id // Format: EMP-DRV-0001
+  name         String
+  employeeId   String   @unique
+  photoUrl     String?
+  contact      String
+  department   String   // ADM, INV, SITE, DRV, REP, FIN
+  createdAt    DateTime @default(now())
+  
+  // Relation to system user (optional - not all employees use the system)
+  user         User?
+}
+
 model User {
-  id              String   @id // Format: EMP-DRV-0001
-  name            String
-  employeeId      String   @unique
-  photoUrl        String?
-  contact         String
-  department      String   // ADM, INV, SITE, DRV, REP, FIN
+  id              String      @id @default(uuid())
+  username        String      @unique
+  password        String      // Should be hashed
+  employeeId      String      @unique // Links to Employee
+  employee        Employee    @relation(fields: [employeeId], references: [id])
   roleId          String
-  role            Role     @relation(fields: [roleId], references: [id])
+  role            Role        @relation(fields: [roleId], references: [id])
+  isActive        Boolean     @default(true)
+  
   raisedDocuments Document[]
   tripsAsDriver   LorryMovementRecord[] @relation("DriverRelation")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 model Role {
