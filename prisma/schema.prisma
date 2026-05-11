@@ -30,6 +30,7 @@ model SubCategory {
   tools       Tool[]
   vehicles    Vehicle[]
   consumables ConsumableBatch[]
+  items       Item[]
   createdAt   DateTime @default(now())
 }
 
@@ -127,6 +128,16 @@ model ReusableItem {
   id       String @id // Format: REUS-SCF-0001-P003
   bundleId String
   pieceNum Int
+}
+
+model Item {
+  id            Int         @id @default(autoincrement())
+  name          String
+  description   String?
+  price         Float?
+  subCategory   SubCategory @relation(fields: [subCategoryId], references: [id])
+  subCategoryId Int
+  createdAt     DateTime    @default(now())
 }
 
 model SiteLocation {
