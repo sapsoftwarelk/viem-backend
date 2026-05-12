@@ -101,6 +101,10 @@ model Tool {
   status          ToolStatus @default(IN_WAREHOUSE)
   locationId      String?
   location        SiteLocation? @relation(fields: [locationId], references: [id])
+  
+  // Link to GRN that created this tool
+  grnId           String?
+  grn             GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
 
   maintenance     MaintenanceRecord[]
   movements       MovementHistory[]
@@ -138,12 +142,20 @@ model ConsumableBatch {
   originalBatchId String?  // For partial returns to preserve FIFO
   locationId      String?
   location        SiteLocation? @relation(fields: [locationId], references: [id])
+  
+  // Link to GRN that created this batch
+  grnId           String?
+  grn             GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
 }
 
 model ReusableItem {
   id       String @id // Format: REUS-SCF-0001-P003
   bundleId String
   pieceNum Int
+  
+  // Link to GRN that created this item
+  grnId    String?
+  grn      GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
 }
 
 model Item {
@@ -177,6 +189,7 @@ model Document {
   isAdminApproved Boolean  @default(false)
 
   poDetails       PurchaseOrder?
+  grnDetails      GoodsReceivedNote?
   ginDetails      GoodsIssueNote?
   lmrDetails      LorryMovementRecord?
 }
@@ -206,6 +219,23 @@ model PurchaseOrder {
   supplier     String
   totalCost    Float
   expectedDate DateTime
+  
+  // Link to GRN when received
+  grn          GoodsReceivedNote?
+}
+
+model GoodsReceivedNote {
+  docId         String   @id
+  document      Document @relation(fields: [docId], references: [id])
+  poId          String   @unique
+  po            PurchaseOrder @relation(fields: [poId], references: [docId])
+  supplier      String
+  receivedDate  DateTime @default(now())
+  
+  // Generated items from this GRN
+  tools         Tool[]
+  consumables   ConsumableBatch[]
+  reusables     ReusableItem[]
 }
 
 model GoodsIssueNote {
