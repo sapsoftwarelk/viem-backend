@@ -32,6 +32,14 @@ export class GoodsIssueNotesController {
     return this.ginService.confirmLoading(id, body.vehicleId, body.driverId);
   }
 
+  @Patch(':id/scan')
+  async scanItem(
+    @Param('id') id: string,
+    @Body() body: { itemId: string; scanQty?: number },
+  ) {
+    return this.ginService.scanGINItem(id, body.itemId, body.scanQty || 1);
+  }
+
   @Patch(':id/deliver')
   async deliver(@Param('id') id: string) {
     return this.ginService.confirmDelivery(id);
@@ -42,9 +50,24 @@ export class GoodsIssueNotesController {
     return this.ginService.reportDiscrepancy(id);
   }
 
+  @Patch(':id/override-fifo')
+  async overrideFIFO(@Param('id') id: string, @Body() body: { itemId: string; reason: string }) {
+    const approverId = 'temp-admin-id';
+    return this.ginService.overrideFIFO(id, body.itemId, approverId, body.reason);
+  }
+
   @Patch(':id/return')
   async initiateReturn(@Param('id') id: string) {
     return this.ginService.initiateReturn(id);
+  }
+
+  @Patch(':id/items/:itemId/return')
+  async returnConsumable(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() body: { quantity: number },
+  ) {
+    return this.ginService.returnConsumable(id, itemId, body.quantity);
   }
 
   @Patch(':id/rt-transit')

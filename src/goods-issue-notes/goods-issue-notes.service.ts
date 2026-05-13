@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocType, GINItemType, GINStatus } from '@prisma/client';
+import { toDataURL } from 'qrcode';
 
 export interface CreateGINItemDto {
   itemType: 'TOOL' | 'CONSUMABLE' | 'REUSABLE';
-  itemId: string;
+  itemId?: string;
+  subCategoryId?: number;
   quantity: number;
+  overrideFIFO?: boolean;
+  fifoOverrideReason?: string;
 }
 
 export interface CreateGINDto {
@@ -23,7 +27,6 @@ export class GoodsIssueNotesService {
       throw new BadRequestException('GIN must include at least one item');
     }
 
-    // Create document
     const ginId = await this.generateGINId();
     await this.prisma.document.create({
       data: {
@@ -43,21 +46,101 @@ export class GoodsIssueNotesService {
       },
     });
 
-    const items = await Promise.all(
-      dto.items.map(async (item) => {
-        await this.validateItem(item);
-        return this.prisma.goodsIssueNoteItem.create({
-          data: {
-            ginId,
-            itemType: item.itemType as GINItemType,
-            toolId: item.itemType === 'TOOL' ? item.itemId : null,
-            consumableId: item.itemType === 'CONSUMABLE' ? item.itemId : null,
-            reusableId: item.itemType === 'REUSABLE' ? item.itemId : null,
-            quantity: item.quantity,
-          },
-        });
-      }),
-    );
+    const items = [] as any[];
+
+    for (const item of dto.items) {
+      if (item.quantity <= 0) {
+        throw new BadRequestException('Item quantity must be greater than zero');
+      }
+
+      if (item.itemType === 'TOOL') {
+        const tool = await this.prisma.tool.findUnique({ where: { id: item.itemId } });
+        if (!tool) throw new NotFoundException('Tool not found');
+        items.push(
+          await this.prisma.goodsIssueNoteItem.create({
+            data: {
+              ginId,
+              itemType: GINItemType.TOOL,
+              toolId: item.itemId,
+              quantity: item.quantity,
+            },
+          }),
+        );
+      } else if (item.itemType === 'REUSABLE') {
+        const reusable = await this.prisma.reusableItem.findUnique({ where: { id: item.itemId } });
+        if (!reusable) throw new NotFoundException('Reusable item not found');
+        items.push(
+          await this.prisma.goodsIssueNoteItem.create({
+            data: {
+              ginId,
+              itemType: GINItemType.REUSABLE,
+              reusableId: item.itemId,
+              quantity: item.quantity,
+            },
+          }),
+        );
+      } else if (item.itemType === 'CONSUMABLE') {
+        if (!item.itemId && !item.subCategoryId) {
+          throw new BadRequestException('Consumable items need itemId or subCategoryId for FIFO selection');
+        }
+
+        if (item.overrideFIFO && !item.fifoOverrideReason) {
+          throw new BadRequestException('FIFO override requires a reason');
+        }
+
+        if (item.itemId) {
+          const batch = await this.prisma.consumableBatch.findUnique({ where: { id: item.itemId } });
+          if (!batch || batch.status !== 'AVAILABLE') {
+            throw new NotFoundException('Consumable batch not available');
+          }
+          if (batch.quantity < item.quantity) {
+            throw new BadRequestException('Insufficient quantity in selected batch');
+          }
+          const updatedBatch = await this.prisma.consumableBatch.update({
+            where: { id: item.itemId },
+            data: {
+              quantity: { decrement: item.quantity },
+              status: batch.quantity - item.quantity <= 0 ? 'DEPLETED' : batch.status,
+            },
+          });
+          items.push(
+            await this.prisma.goodsIssueNoteItem.create({
+              data: {
+                ginId,
+                itemType: GINItemType.CONSUMABLE,
+                consumableId: batch.id,
+                quantity: item.quantity,
+                fifoOverride: item.overrideFIFO || false,
+                fifoOverrideReason: item.fifoOverrideReason,
+                fifoOverrideApprovedBy: item.overrideFIFO ? userId : null,
+                fifoOverrideApprovedAt: item.overrideFIFO ? new Date() : null,
+              },
+            }),
+          );
+        } else {
+          const selections = await this.selectConsumableBatches(item.subCategoryId!, item.quantity);
+          for (const selection of selections) {
+            const updatedBatch = await this.prisma.consumableBatch.update({
+              where: { id: selection.batch.id },
+              data: {
+                quantity: { decrement: selection.quantity },
+                status: selection.batch.quantity - selection.quantity <= 0 ? 'DEPLETED' : selection.batch.status,
+              },
+            });
+            items.push(
+              await this.prisma.goodsIssueNoteItem.create({
+                data: {
+                  ginId,
+                  itemType: GINItemType.CONSUMABLE,
+                  consumableId: selection.batch.id,
+                  quantity: selection.quantity,
+                },
+              }),
+            );
+          }
+        }
+      }
+    }
 
     return { gin, items };
   }
@@ -99,11 +182,17 @@ export class GoodsIssueNotesService {
     if (gin.status !== GINStatus.DRAFT) {
       throw new BadRequestException('GIN can only be moved to READY from DRAFT');
     }
+
+    const qrPayload = JSON.stringify({ type: 'GIN', id, timestamp: new Date().toISOString() });
+    const qrCodeDataUrl = await toDataURL(qrPayload);
+
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
       data: {
         status: GINStatus.READY,
         readyAt: new Date(),
+        qrCodeDataUrl,
+        qrPayload,
       },
     });
     await this.prisma.document.update({
@@ -154,21 +243,51 @@ export class GoodsIssueNotesService {
     return result;
   }
 
+  async scanGINItem(ginId: string, itemId: string, scanQty = 1) {
+    const gin = await this.findOne(ginId);
+    if (gin.status !== GINStatus.IN_TRANSIT && gin.status !== GINStatus.DELIVERED) {
+      throw new BadRequestException('Items may only be scanned while GIN is in transit or at delivery');
+    }
+
+    const item = await this.prisma.goodsIssueNoteItem.findUnique({ where: { id: itemId } });
+    if (!item || item.ginId !== ginId) {
+      throw new NotFoundException('GIN item not found');
+    }
+
+    const newScanned = item.scannedCount + scanQty;
+    if (newScanned > item.quantity) {
+      throw new BadRequestException('Scan count exceeds expected quantity');
+    }
+
+    return this.prisma.goodsIssueNoteItem.update({
+      where: { id: itemId },
+      data: { scannedCount: newScanned },
+    });
+  }
+
   async confirmDelivery(id: string) {
     const gin = await this.findOne(id);
     if (gin.status !== GINStatus.IN_TRANSIT) {
       throw new BadRequestException('GIN must be IN_TRANSIT before delivery');
     }
+
+    const items = await this.prisma.goodsIssueNoteItem.findMany({ where: { ginId: id } });
+    if (items.length === 0) {
+      throw new BadRequestException('GIN has no items to deliver');
+    }
+
+    const hasMismatch = items.some((item) => item.scannedCount !== item.quantity);
+    const newStatus = hasMismatch ? GINStatus.DISCREPANCY : GINStatus.DELIVERED;
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
       data: {
-        status: GINStatus.DELIVERED,
+        status: newStatus,
         deliveredAt: new Date(),
       },
     });
     await this.prisma.document.update({
       where: { id },
-      data: { status: 'DELIVERED' },
+      data: { status: hasMismatch ? 'DISCREPANCY' : 'DELIVERED' },
     });
     return result;
   }
@@ -189,6 +308,57 @@ export class GoodsIssueNotesService {
       data: { status: 'DISCREPANCY' },
     });
     return result;
+  }
+
+  async overrideFIFO(ginId: string, itemId: string, approverId: string, reason: string) {
+    if (!reason) {
+      throw new BadRequestException('FIFO override reason is required');
+    }
+    const item = await this.prisma.goodsIssueNoteItem.findUnique({ where: { id: itemId } });
+    if (!item || item.ginId !== ginId || item.itemType !== GINItemType.CONSUMABLE) {
+      throw new NotFoundException('Consumable GIN item not found');
+    }
+    return this.prisma.goodsIssueNoteItem.update({
+      where: { id: itemId },
+      data: {
+        fifoOverride: true,
+        fifoOverrideReason: reason,
+        fifoOverrideApprovedBy: approverId,
+        fifoOverrideApprovedAt: new Date(),
+      },
+    });
+  }
+
+  async returnConsumable(ginId: string, itemId: string, quantity: number) {
+    const gin = await this.findOne(ginId);
+    if (gin.status !== GINStatus.RETURNING && gin.status !== GINStatus.RTN_TRANSIT) {
+      throw new BadRequestException('Consumable returns are only allowed during return workflows');
+    }
+    const item = await this.prisma.goodsIssueNoteItem.findUnique({ where: { id: itemId } });
+    if (!item || item.ginId !== ginId || item.itemType !== GINItemType.CONSUMABLE) {
+      throw new NotFoundException('Consumable GIN item not found');
+    }
+    if (quantity <= 0 || quantity > item.quantity) {
+      throw new BadRequestException('Invalid return quantity');
+    }
+
+    const batch = await this.prisma.consumableBatch.findUnique({ where: { id: item.consumableId! } });
+    if (!batch) throw new NotFoundException('Original consumable batch not found');
+
+    await this.prisma.consumableBatch.update({
+      where: { id: batch.id },
+      data: {
+        quantity: { increment: quantity },
+        status: batch.status === 'DEPLETED' ? 'AVAILABLE' : batch.status,
+      },
+    });
+
+    return this.prisma.goodsIssueNoteItem.update({
+      where: { id: itemId },
+      data: {
+        returnedQuantity: { increment: quantity },
+      },
+    });
   }
 
   async initiateReturn(id: string) {
@@ -263,22 +433,131 @@ export class GoodsIssueNotesService {
     return result;
   }
 
-  private async validateItem(item: CreateGINItemDto) {
-    if (item.quantity <= 0) {
-      throw new BadRequestException('Item quantity must be greater than zero');
+  private async selectConsumableBatches(subCategoryId: number, quantity: number) {
+    const now = new Date();
+    const batches = await this.prisma.consumableBatch.findMany({
+      where: {
+        subCategoryId,
+        status: 'AVAILABLE',
+        expiryDate: { gte: now },
+        quantity: { gt: 0 },
+      },
+      orderBy: {
+        receivedDate: 'asc',
+      },
+    });
+
+    let remaining = quantity;
+    const selections: Array<{ batch: any; quantity: number }> = [];
+
+    for (const batch of batches) {
+      if (remaining <= 0) break;
+      const take = Math.min(batch.quantity, remaining);
+      selections.push({ batch, quantity: take });
+      remaining -= take;
     }
-    if (item.itemType === 'TOOL') {
-      const tool = await this.prisma.tool.findUnique({ where: { id: item.itemId } });
-      if (!tool) throw new NotFoundException('Tool not found');
+
+    if (remaining > 0) {
+      throw new BadRequestException('Not enough consumable quantity available to fulfill FIFO selection');
     }
-    if (item.itemType === 'CONSUMABLE') {
-      const batch = await this.prisma.consumableBatch.findUnique({ where: { id: item.itemId } });
-      if (!batch) throw new NotFoundException('Consumable batch not found');
+
+    return selections;
+  }
+
+  private async createSystemUser() {
+    const systemId = 'system-user-id';
+    const user = await this.prisma.user.findUnique({ where: { id: systemId } });
+    if (user) return user;
+
+    const employee = await this.prisma.employee.upsert({
+      where: { id: 'EMP-SYS-0001' },
+      update: {},
+      create: {
+        id: 'EMP-SYS-0001',
+        name: 'System',
+        employeeId: 'SYS0001',
+        contact: 'system@veims.local',
+        department: 'ADM',
+      },
+    });
+
+    const role = await this.prisma.role.upsert({
+      where: { name: 'System' },
+      update: {},
+      create: {
+        name: 'System',
+        canCreateUsers: false,
+        canRaisePO: false,
+        canConfirmDeliveries: false,
+        canRunAudits: false,
+        canLogMachineHours: false,
+      },
+    });
+
+    return this.prisma.user.create({
+      data: {
+        id: systemId,
+        username: 'system',
+        password: 'system',
+        employeeId: employee.id,
+        roleId: role.id,
+      },
+    });
+  }
+
+  async expireConsumableBatches() {
+    const systemUser = await this.createSystemUser();
+    const now = new Date();
+    const batches = await this.prisma.consumableBatch.findMany({
+      where: {
+        expiryDate: { lt: now },
+        status: 'AVAILABLE',
+      },
+    });
+
+    const results: string[] = [];
+    for (const batch of batches) {
+      await this.prisma.consumableBatch.update({
+        where: { id: batch.id },
+        data: { status: 'EXPIRED' },
+      });
+
+      const noteId = await this.generateExpiryNoteId();
+      await this.prisma.document.create({
+        data: {
+          id: noteId,
+          type: DocType.EXN,
+          creatorId: systemUser.id,
+          status: 'EXPIRED',
+          isAdminApproved: false,
+        },
+      });
+      await this.prisma.expiryNote.create({
+        data: {
+          docId: noteId,
+          batchId: batch.id,
+          action: 'Auto-expired due to expiry date',
+        },
+      });
+      results.push(batch.id);
     }
-    if (item.itemType === 'REUSABLE') {
-      const reusable = await this.prisma.reusableItem.findUnique({ where: { id: item.itemId } });
-      if (!reusable) throw new NotFoundException('Reusable item not found');
-    }
+
+    return results;
+  }
+
+  private async generateExpiryNoteId(): Promise<string> {
+    const today = new Date();
+    const count = await this.prisma.document.count({
+      where: {
+        type: DocType.EXN,
+        createdAt: {
+          gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+        },
+      },
+    });
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '-');
+    return `EXN-${dateStr}-${(count + 1).toString().padStart(3, '0')}`;
   }
 
   private async generateGINId(): Promise<string> {

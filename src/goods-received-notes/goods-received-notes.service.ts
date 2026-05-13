@@ -214,4 +214,100 @@ export class GoodsReceivedNotesService {
 
     return grn;
   }
+
+  private async createSystemUser() {
+    const systemId = 'system-user-id';
+    const user = await this.prisma.user.findUnique({ where: { id: systemId } });
+    if (user) return user;
+
+    const employee = await this.prisma.employee.upsert({
+      where: { id: 'EMP-SYS-0001' },
+      update: {},
+      create: {
+        id: 'EMP-SYS-0001',
+        name: 'System',
+        employeeId: 'SYS0001',
+        contact: 'system@veims.local',
+        department: 'ADM',
+      },
+    });
+
+    const role = await this.prisma.role.upsert({
+      where: { name: 'System' },
+      update: {},
+      create: {
+        name: 'System',
+        canCreateUsers: false,
+        canRaisePO: false,
+        canConfirmDeliveries: false,
+        canRunAudits: false,
+        canLogMachineHours: false,
+      },
+    });
+
+    return this.prisma.user.create({
+      data: {
+        id: systemId,
+        username: 'system',
+        password: 'system',
+        employeeId: employee.id,
+        roleId: role.id,
+      },
+    });
+  }
+
+  async expireConsumableBatches() {
+    const systemUser = await this.createSystemUser();
+    const now = new Date();
+    const batches = await this.prisma.consumableBatch.findMany({
+      where: {
+        expiryDate: { lt: now },
+        status: 'AVAILABLE',
+      },
+    });
+
+    const results: string[] = [];
+    for (const batch of batches) {
+      await this.prisma.consumableBatch.update({
+        where: { id: batch.id },
+        data: { status: 'EXPIRED' },
+      });
+
+      const noteId = await this.generateExpiryNoteId();
+      await this.prisma.document.create({
+        data: {
+          id: noteId,
+          type: DocType.EXN,
+          creatorId: systemUser.id,
+          status: 'EXPIRED',
+          isAdminApproved: false,
+        },
+      });
+      await this.prisma.expiryNote.create({
+        data: {
+          docId: noteId,
+          batchId: batch.id,
+          action: 'Auto-expired due to expiry date',
+        },
+      });
+      results.push(batch.id);
+    }
+
+    return results;
+  }
+
+  private async generateExpiryNoteId(): Promise<string> {
+    const today = new Date();
+    const count = await this.prisma.document.count({
+      where: {
+        type: DocType.EXN,
+        createdAt: {
+          gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+        },
+      },
+    });
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '-');
+    return `EXN-${dateStr}-${(count + 1).toString().padStart(3, '0')}`;
+  }
 }

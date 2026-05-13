@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { GoodsReceivedNotesService } from './goods-received-notes.service';
 import type { CreateGRNDto } from './goods-received-notes.service';
 
@@ -8,8 +8,7 @@ export class GoodsReceivedNotesController {
 
   @Post()
   async create(@Body() createGRNDto: CreateGRNDto) {
-    // TODO: Get userId from authentication context
-    const userId = 'temp-user-id'; // Replace with actual user from auth
+    const userId = 'temp-user-id';
     return this.grnService.createGRN(userId, createGRNDto);
   }
 
@@ -21,5 +20,10 @@ export class GoodsReceivedNotesController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.grnService.findOne(id);
+  }
+
+  @Post('expire-batches')
+  async expireBatches() {
+    return this.grnService.expireConsumableBatches();
   }
 }
