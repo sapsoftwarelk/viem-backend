@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { DocType, GINItemType, GINStatus } from '@prisma/client';
+import { DocType, GINItemType, GINStatus, ToolStatus } from '@prisma/client';
 import { toDataURL } from 'qrcode';
 
 export interface CreateGINItemDto {
@@ -56,6 +56,10 @@ export class GoodsIssueNotesService {
       if (item.itemType === 'TOOL') {
         const tool = await this.prisma.tool.findUnique({ where: { id: item.itemId } });
         if (!tool) throw new NotFoundException('Tool not found');
+        const availableForDispatch = [ToolStatus.IN_WAREHOUSE, ToolStatus.READY];
+        if (!availableForDispatch.includes(tool.status as any)) {
+          throw new BadRequestException('Tool is not available for dispatch');
+        }
         items.push(
           await this.prisma.goodsIssueNoteItem.create({
             data: {
@@ -199,6 +203,7 @@ export class GoodsIssueNotesService {
       where: { id },
       data: { status: 'READY' },
     });
+    await this.updateToolStatusesForGINItems(id, ToolStatus.READY);
     return result;
   }
 
@@ -240,6 +245,7 @@ export class GoodsIssueNotesService {
       where: { id },
       data: { status: 'IN_TRANSIT' },
     });
+    await this.updateToolStatusesForGINItems(id, ToolStatus.IN_TRANSIT);
     return result;
   }
 
@@ -289,6 +295,9 @@ export class GoodsIssueNotesService {
       where: { id },
       data: { status: hasMismatch ? 'DISCREPANCY' : 'DELIVERED' },
     });
+    if (!hasMismatch) {
+      await this.updateToolStatusesForGINItems(id, ToolStatus.ON_SITE, gin.siteLocationId || undefined);
+    }
     return result;
   }
 
@@ -376,6 +385,7 @@ export class GoodsIssueNotesService {
       where: { id },
       data: { status: 'RETURNING' },
     });
+    await this.updateToolStatusesForGINItems(id, ToolStatus.RETURN_INITIATED);
     return result;
   }
 
@@ -394,6 +404,7 @@ export class GoodsIssueNotesService {
       where: { id },
       data: { status: 'RTN_TRANSIT' },
     });
+    await this.updateToolStatusesForGINItems(id, ToolStatus.RETURNING);
     return result;
   }
 
@@ -412,6 +423,7 @@ export class GoodsIssueNotesService {
       where: { id },
       data: { status: 'RECEIVED_AT_WH' },
     });
+    await this.updateToolStatusesForGINItems(id, ToolStatus.RECEIVED_AT_WH);
     return result;
   }
 
@@ -430,6 +442,9 @@ export class GoodsIssueNotesService {
       where: { id },
       data: { status: 'CLOSED' },
     });
+    if (gin.status === GINStatus.RECEIVED_AT_WH) {
+      await this.updateToolStatusesForGINItems(id, ToolStatus.IN_WAREHOUSE);
+    }
     return result;
   }
 
@@ -462,6 +477,40 @@ export class GoodsIssueNotesService {
     }
 
     return selections;
+  }
+
+  private async updateToolStatusesForGINItems(ginId: string, status: ToolStatus, locationId?: string) {
+    const toolItems = await this.prisma.goodsIssueNoteItem.findMany({
+      where: { ginId, itemType: GINItemType.TOOL },
+    });
+
+    for (const item of toolItems) {
+      if (!item.toolId) continue;
+
+      const data: { status: ToolStatus; locationId?: string | null } = {
+        status,
+      };
+
+      if (locationId !== undefined) {
+        data.locationId = locationId;
+      }
+
+      if (status === ToolStatus.IN_TRANSIT || status === ToolStatus.RECEIVED_AT_WH) {
+        data.locationId = null;
+      }
+
+      await this.prisma.tool.update({
+        where: { id: item.toolId },
+        data,
+      });
+
+      await this.prisma.movementHistory.create({
+        data: {
+          toolId: item.toolId,
+          location: locationId || status,
+        },
+      });
+    }
   }
 
   private async createSystemUser() {
