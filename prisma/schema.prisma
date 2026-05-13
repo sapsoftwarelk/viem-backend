@@ -173,6 +173,7 @@ model SiteLocation {
   siteName    String
   tools       Tool[]
   consumables ConsumableBatch[]
+  ginNotes    GoodsIssueNote[]
 }
 
 // ---------------------------------------------------------
@@ -245,11 +246,33 @@ model GoodsIssueNote {
   isSiteDirect Boolean   @default(false)
   lmrId        String?
   lmr          LorryMovementRecord? @relation(fields: [lmrId], references: [id])
-  
+  siteLocationId String?
+  siteLocation  SiteLocation? @relation(fields: [siteLocationId], references: [id])
+
   // Transitions
   readyAt      DateTime?
   inTransitAt  DateTime?
   deliveredAt  DateTime?
+
+  items        GoodsIssueNoteItem[]
+}
+
+model GoodsIssueNoteItem {
+  id              String        @id @default(uuid())
+  ginId           String
+  gin             GoodsIssueNote @relation(fields: [ginId], references: [docId])
+  itemType        GINItemType
+  toolId          String?
+  consumableId    String?
+  reusableId      String?
+  quantity        Float
+  scannedCount    Int           @default(0)
+}
+
+enum GINItemType {
+  TOOL
+  CONSUMABLE
+  REUSABLE
 }
 
 enum GINStatus {
