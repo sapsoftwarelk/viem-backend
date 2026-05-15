@@ -106,8 +106,9 @@ model Tool {
   grnId           String?
   grn             GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
 
-  maintenance     MaintenanceRecord[]
-  movements       MovementHistory[]
+  goodsIssueNoteItems GoodsIssueNoteItem[]
+  maintenance         MaintenanceRecord[]
+  movements           MovementHistory[]
 }
 
 enum ToolStatus {
@@ -132,6 +133,12 @@ model Vehicle {
   trips         LorryMovementRecord[]
 }
 
+enum ConsumableBatchStatus {
+  AVAILABLE
+  DEPLETED
+  EXPIRED
+}
+
 model ConsumableBatch {
   id              String   @id // Format: CONS-CEM-2026-04-29-001
   subCategoryId   Int
@@ -147,13 +154,9 @@ model ConsumableBatch {
   // Link to GRN that created this batch
   grnId           String?
   grn             GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
-  expiryNotes     ExpiryNote[]
-}
 
-enum ConsumableBatchStatus {
-  AVAILABLE
-  EXPIRED
-  DEPLETED
+  goodsIssueNoteItems GoodsIssueNoteItem[]
+  expiryNotes         ExpiryNote[]
 }
 
 model ReusableItem {
@@ -164,6 +167,8 @@ model ReusableItem {
   // Link to GRN that created this item
   grnId    String?
   grn      GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
+
+  goodsIssueNoteItems GoodsIssueNoteItem[]
 }
 
 model Item {
@@ -177,11 +182,13 @@ model Item {
 }
 
 model SiteLocation {
-  id          String   @id // Format: SITE-COL-0001-A-L3-S2
-  siteName    String
-  tools       Tool[]
-  consumables ConsumableBatch[]
-  ginNotes    GoodsIssueNote[]
+  id                 String   @id // Format: SITE-COL-0001-A-L3-S2
+  siteName           String
+  tools              Tool[]
+  consumables        ConsumableBatch[]
+  originTrips        LorryMovementRecord[] @relation("LmrOriginLocation")
+  destinationTrips   LorryMovementRecord[] @relation("LmrDestinationLocation")
+  goodsIssueNotes     GoodsIssueNote[]
 }
 
 // ---------------------------------------------------------
@@ -223,6 +230,12 @@ enum DocType {
   LMR
 }
 
+enum GINItemType {
+  TOOL
+  CONSUMABLE
+  REUSABLE
+}
+
 model PurchaseOrder {
   docId        String   @id
   document     Document @relation(fields: [docId], references: [id])
@@ -248,6 +261,15 @@ model GoodsReceivedNote {
   reusables     ReusableItem[]
 }
 
+model ExpiryNote {
+  docId     String   @id
+  document  Document @relation(fields: [docId], references: [id])
+  batchId   String
+  batch     ConsumableBatch @relation(fields: [batchId], references: [id])
+  action    String
+  createdAt DateTime @default(now())
+}
+
 model GoodsIssueNote {
   docId           String    @id
   document        Document  @relation(fields: [docId], references: [id])
@@ -259,36 +281,13 @@ model GoodsIssueNote {
   siteLocation    SiteLocation? @relation(fields: [siteLocationId], references: [id])
   qrCodeDataUrl   String?
   qrPayload       String?
-
+  
   // Transitions
   readyAt         DateTime?
   inTransitAt     DateTime?
   deliveredAt     DateTime?
-
+  
   items           GoodsIssueNoteItem[]
-}
-
-model GoodsIssueNoteItem {
-  id                      String        @id @default(uuid())
-  ginId                   String
-  gin                     GoodsIssueNote @relation(fields: [ginId], references: [docId])
-  itemType                GINItemType
-  toolId                  String?
-  consumableId            String?
-  reusableId              String?
-  quantity                Float
-  scannedCount            Int           @default(0)
-  returnedQuantity        Float         @default(0)
-  fifoOverride            Boolean       @default(false)
-  fifoOverrideReason      String?
-  fifoOverrideApprovedBy  String?
-  fifoOverrideApprovedAt  DateTime?
-}
-
-enum GINItemType {
-  TOOL
-  CONSUMABLE
-  REUSABLE
 }
 
 enum GINStatus {
@@ -303,23 +302,53 @@ enum GINStatus {
   CLOSED
 }
 
-model LorryMovementRecord {
-  id            String   @id // Auto-created per trip
-  document      Document @relation(fields: [id], references: [id])
-  vehicleId     String
-  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
-  driverId      String
-  driver        User     @relation("DriverRelation", fields: [driverId], references: [id])
-  departureTime DateTime @default(now())
-  gins          GoodsIssueNote[] // Multi-cargo trips
+enum LMRStatus {
+  LOADED
+  IN_TRANSIT
+  DELIVERED
+  RETURNING
+  RETURNED
+  CLOSED
 }
 
-model ExpiryNote {
-  docId    String   @id
-  document Document @relation(fields: [docId], references: [id])
-  batchId  String
-  batch    ConsumableBatch @relation(fields: [batchId], references: [id])
-  action   String
+model LorryMovementRecord {
+  id                    String        @id // Auto-created per trip
+  document              Document      @relation(fields: [id], references: [id])
+  vehicleId             String
+  vehicle               Vehicle       @relation(fields: [vehicleId], references: [id])
+  driverId              String
+  driver                User          @relation("DriverRelation", fields: [driverId], references: [id])
+  departureTime         DateTime      @default(now())
+  status                LMRStatus     @default(LOADED)
+  originLocationId      String?
+  originLocation        SiteLocation? @relation("LmrOriginLocation", fields: [originLocationId], references: [id])
+  destinationLocationId String?
+  destinationLocation   SiteLocation? @relation("LmrDestinationLocation", fields: [destinationLocationId], references: [id])
+  expectedReturnTime    DateTime?
+  arrivalTime           DateTime?
+  actualReturnTime      DateTime?
+  remarks               String?
+  gins                  GoodsIssueNote[] // Multi-cargo trips
+}
+
+model GoodsIssueNoteItem {
+  id                        String           @id @default(uuid())
+  ginId                     String
+  gin                       GoodsIssueNote   @relation(fields: [ginId], references: [docId])
+  itemType                  GINItemType
+  toolId                    String?
+  tool                      Tool?            @relation(fields: [toolId], references: [id])
+  reusableId                String?
+  reusable                  ReusableItem?    @relation(fields: [reusableId], references: [id])
+  consumableId              String?
+  consumable                ConsumableBatch? @relation(fields: [consumableId], references: [id])
+  quantity                  Float
+  scannedCount              Float            @default(0)
+  returnedQuantity          Float            @default(0)
+  fifoOverride              Boolean          @default(false)
+  fifoOverrideReason        String?
+  fifoOverrideApprovedBy    String?
+  fifoOverrideApprovedAt    DateTime?
 }
 
 // ---------------------------------------------------------
