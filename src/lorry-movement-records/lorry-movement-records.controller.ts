@@ -1,14 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards, Request } from '@nestjs/common';
 import type { CreateLMRDto, UpdateLMRStatusDto, UpdateLMRReturnDto } from './lorry-movement-records.service';
 import { LorryMovementRecordsService } from './lorry-movement-records.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('lmrs')
+@UseGuards(JwtAuthGuard)
 export class LorryMovementRecordsController {
   constructor(private readonly lmrService: LorryMovementRecordsService) {}
 
   @Post()
-  async create(@Body() dto: CreateLMRDto) {
-    const driverId = 'temp-driver-id';
+  async create(@Body() dto: CreateLMRDto, @Request() req) {
+    const driverId = req.user.employeeId;
     return this.lmrService.createLMR(driverId, dto);
   }
 

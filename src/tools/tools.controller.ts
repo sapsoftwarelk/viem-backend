@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ToolsService } from './tools.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { UpdateToolStatusDto, LogMachineHoursDto, RecordMovementDto } from './tools.service';
 
 @Controller('tools')
+@UseGuards(JwtAuthGuard)
 export class ToolsController {
   constructor(private readonly toolsService: ToolsService) {}
 

@@ -1,15 +1,16 @@
-import { Controller, Get, Post, Body, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, UseGuards, Request } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { CreatePODto, ApprovePODto } from './purchase-orders.service';
 
 @Controller('purchase-orders')
+@UseGuards(JwtAuthGuard)
 export class PurchaseOrdersController {
   constructor(private readonly poService: PurchaseOrdersService) {}
 
   @Post()
-  async create(@Body() createPODto: CreatePODto) {
-    // TODO: Get userId from authentication context
-    const userId = 'temp-user-id'; // Replace with actual user from auth
+  async create(@Body() createPODto: CreatePODto, @Request() req) {
+    const userId = req.user.id;
     return this.poService.createPO(userId, createPODto);
   }
 

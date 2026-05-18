@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { SubCategoriesService } from './sub-categories.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('sub-categories')
+@UseGuards(JwtAuthGuard)
 export class SubCategoriesController {
   constructor(private readonly subCategoriesService: SubCategoriesService) {}
 

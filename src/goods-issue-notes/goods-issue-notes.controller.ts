@@ -1,14 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards, Request } from '@nestjs/common';
 import type { CreateGINDto } from './goods-issue-notes.service';
 import { GoodsIssueNotesService } from './goods-issue-notes.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('goods-issue-notes')
+@UseGuards(JwtAuthGuard)
 export class GoodsIssueNotesController {
   constructor(private readonly ginService: GoodsIssueNotesService) {}
 
   @Post()
-  async create(@Body() createGINDto: CreateGINDto) {
-    const userId = 'temp-user-id';
+  async create(@Body() createGINDto: CreateGINDto, @Request() req) {
+    const userId = req.user.id;
     return this.ginService.createGIN(userId, createGINDto);
   }
 
