@@ -30,7 +30,6 @@ model SubCategory {
   tools       Tool[]
   vehicles    Vehicle[]
   consumables ConsumableBatch[]
-  items       Item[]
   createdAt   DateTime @default(now())
 }
 
@@ -169,16 +168,6 @@ model ReusableItem {
   grn      GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
 
   goodsIssueNoteItems GoodsIssueNoteItem[]
-}
-
-model Item {
-  id            Int         @id @default(autoincrement())
-  name          String
-  description   String?
-  price         Float?
-  subCategory   SubCategory @relation(fields: [subCategoryId], references: [id])
-  subCategoryId Int
-  createdAt     DateTime    @default(now())
 }
 
 model SiteLocation {
