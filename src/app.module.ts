@@ -9,6 +9,7 @@ import { GoodsIssueNotesModule } from './goods-issue-notes/goods-issue-notes.mod
 import { RolesModule } from './roles/roles.module';
 import { AuthModule } from './auth/auth.module';
 import { EmployeesModule } from './employees/employees.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EmployeesModule } from './employees/employees.module';
     }),
     PrismaModule,
     AuthModule,
+    UsersModule,
     CategoriesModule,
     SubCategoriesModule,
     GoodsReceivedNotesModule,
