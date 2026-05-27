@@ -39,6 +39,10 @@ export class UsersService implements OnModuleInit {
       update: {},
       create: {
         name: 'SUPER_ADMIN',
+        position_title: 'Super Admin',
+        level: 'ADMIN',
+        status: 'ACTIVE',
+        description: 'Super administrator with full permissions',
         canCreateUsers: true,
         canRaisePO: true,
         canConfirmDeliveries: true,

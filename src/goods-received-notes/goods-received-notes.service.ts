@@ -237,6 +237,10 @@ export class GoodsReceivedNotesService {
       update: {},
       create: {
         name: 'System',
+        position_title: 'System',
+        level: 'SYSTEM',
+        status: 'ACTIVE',
+        description: 'System role for automated operations',
         canCreateUsers: false,
         canRaisePO: false,
         canConfirmDeliveries: false,

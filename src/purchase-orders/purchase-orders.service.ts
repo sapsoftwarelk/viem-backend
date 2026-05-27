@@ -48,6 +48,10 @@ export class PurchaseOrdersService {
         update: {},
         create: {
           name: 'Test Role',
+          position_title: 'Test Role',
+          level: 'TEST',
+          status: 'ACTIVE',
+          description: 'Temporary test role for purchase order flows',
           canCreateUsers: false,
           canRaisePO: true,
           canConfirmDeliveries: false,
