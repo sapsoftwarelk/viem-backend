@@ -5,23 +5,85 @@ import { PrismaService } from '../prisma/prisma.service';
 export class VehiclesService {
   constructor(private prisma: PrismaService) {}
 
+  // GET ALL VEHICLES
   findAll() {
-    return this.prisma.vehicle.findMany({ include: { subCategory: true, trips: true } });
+    return this.prisma.vehicle.findMany({
+      include: {
+        trips: true,
+      },
+    });
   }
 
+  // GET SINGLE VEHICLE
   findOne(id: string) {
-    return this.prisma.vehicle.findUnique({ where: { id }, include: { subCategory: true, trips: true } });
+    return this.prisma.vehicle.findUnique({
+      where: { id },
+      include: {
+        trips: true,
+      },
+    });
   }
 
-  create(data: { id: string; subCategoryId: number }) {
-    return this.prisma.vehicle.create({ data });
+  // CREATE VEHICLE
+  create(data: {
+    id: string;
+
+    registrationNo: string;
+    category: string;
+
+    make: string;
+    model: string;
+
+    year: number;
+    color: string;
+
+    fuelType: string;
+
+    status?: string;
+
+    notes?: string;
+
+    insuranceExpiry: Date;
+    registrationExpiry: Date;
+  }) {
+    return this.prisma.vehicle.create({
+      data,
+    });
   }
 
-  update(id: string, data: { subCategoryId?: number }) {
-    return this.prisma.vehicle.update({ where: { id }, data });
+  // UPDATE VEHICLE
+  update(
+    id: string,
+    data: {
+      registrationNo?: string;
+      category?: string;
+
+      make?: string;
+      model?: string;
+
+      year?: number;
+      color?: string;
+
+      fuelType?: string;
+
+      status?: string;
+
+      notes?: string;
+
+      insuranceExpiry?: Date;
+      registrationExpiry?: Date;
+    },
+  ) {
+    return this.prisma.vehicle.update({
+      where: { id },
+      data,
+    });
   }
 
+  // DELETE VEHICLE
   remove(id: string) {
-    return this.prisma.vehicle.delete({ where: { id } });
+    return this.prisma.vehicle.delete({
+      where: { id },
+    });
   }
 }
