@@ -29,6 +29,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
+    // Backfill roles: copy `name` to `position_title` when empty.
+    try {
+      const roles = await this.role.findMany();
+      for (const r of roles) {
+        if ((!r.position_title || r.position_title === '') && (r as any).name) {
+          await this.role.update({ where: { id: r.id }, data: { position_title: (r as any).name } });
+        }
+      }
+    } catch (e) {
+      // Ignore errors during backfill to avoid blocking startup in dev environments
+      // Log for visibility
+      // eslint-disable-next-line no-console
+      console.warn('Role backfill skipped or failed:', e?.message ?? e);
+    }
   }
 
   async onModuleDestroy() {

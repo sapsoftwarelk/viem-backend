@@ -43,18 +43,19 @@ export class PurchaseOrdersService {
       });
 
       // Create dummy role
-      const role = await this.prisma.role.upsert({
-        where: { name: 'Test Role' },
-        update: {},
-        create: {
-          name: 'Test Role',
-          canCreateUsers: false,
-          canRaisePO: true,
-          canConfirmDeliveries: false,
-          canRunAudits: false,
-          canLogMachineHours: false,
-        },
-      });
+      let role = await this.prisma.role.findFirst({ where: { position_title: 'Test Role' } });
+      if (!role) {
+        role = await this.prisma.role.create({
+            data: {
+              position_title: 'Test Role',
+            canCreateUsers: false,
+            canRaisePO: true,
+            canConfirmDeliveries: false,
+            canRunAudits: false,
+            canLogMachineHours: false,
+          },
+        });
+      }
 
       // Create dummy user
       user = await this.prisma.user.create({

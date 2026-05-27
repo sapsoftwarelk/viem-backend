@@ -232,18 +232,19 @@ export class GoodsReceivedNotesService {
       },
     });
 
-    const role = await this.prisma.role.upsert({
-      where: { name: 'System' },
-      update: {},
-      create: {
-        name: 'System',
-        canCreateUsers: false,
-        canRaisePO: false,
-        canConfirmDeliveries: false,
-        canRunAudits: false,
-        canLogMachineHours: false,
-      },
-    });
+    let role = await this.prisma.role.findFirst({ where: { position_title: 'System' } });
+    if (!role) {
+      role = await this.prisma.role.create({
+        data: {
+          position_title: 'System',
+          canCreateUsers: false,
+          canRaisePO: false,
+          canConfirmDeliveries: false,
+          canRunAudits: false,
+          canLogMachineHours: false,
+        },
+      });
+    }
 
     return this.prisma.user.create({
       data: {

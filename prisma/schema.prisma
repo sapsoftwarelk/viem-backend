@@ -68,11 +68,10 @@ model User {
 
 model Role {
   id                   String  @id @default(uuid())
-  name                 String  @unique // Driver, Technical Officer, CEO
-  position_title       String
-  level                String
-  status               String
-  description          String
+  position_title       String  @unique @default("")
+  level                String  @default("")
+  status               String  @default("active")
+  description          String  @default("")
   
   // Permission Matrix (16 flags)
   canCreateUsers       Boolean @default(false)
