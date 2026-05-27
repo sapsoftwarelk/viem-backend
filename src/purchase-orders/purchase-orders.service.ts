@@ -34,29 +34,31 @@ export class PurchaseOrdersService {
     let user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       // Create dummy employee first
-      const employee = await this.prisma.employee.upsert({
-        where: { id: 'EMP-INV-0001' },
-        update: {},
-        create: {
-          id: 'EMP-INV-0001',
-          name: 'Test User',
-          employeeId: 'EMP001',
-          contact: 'test@example.com',
-          department: 'INV',
-        },
-      });
-
-      // Create dummy role
       const role = await this.prisma.role.upsert({
-        where: { name: 'Test Role' },
+        where: { position_title: 'Test Role' },
         update: {},
         create: {
-          name: 'Test Role',
+          position_title: 'Test Role',
           canCreateUsers: false,
           canRaisePO: true,
           canConfirmDeliveries: false,
           canRunAudits: false,
           canLogMachineHours: false,
+        },
+      });
+
+      const employee = await this.prisma.employee.upsert({
+        where: { id: 'EMP-INV-0001' },
+        update: { roleId: role.id },
+        create: {
+          id: 'EMP-INV-0001',
+          fullName: 'Test User',
+          employeeId: 'EMP001',
+          contact: 'test@example.com',
+          department: 'INV',
+          status: 'ACTIVE',
+          joinDate: new Date(),
+          roleId: role.id,
         },
       });
 

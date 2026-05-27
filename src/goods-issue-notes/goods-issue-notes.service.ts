@@ -618,28 +618,31 @@ export class GoodsIssueNotesService {
     const user = await this.prisma.user.findUnique({ where: { id: systemId } });
     if (user) return user;
 
-    const employee = await this.prisma.employee.upsert({
-      where: { id: 'EMP-SYS-0001' },
-      update: {},
-      create: {
-        id: 'EMP-SYS-0001',
-        name: 'System',
-        employeeId: 'SYS0001',
-        contact: 'system@veims.local',
-        department: 'ADM',
-      },
-    });
-
     const role = await this.prisma.role.upsert({
-      where: { name: 'System' },
+      where: { position_title: 'System' },
       update: {},
       create: {
-        name: 'System',
+        position_title: 'System',
         canCreateUsers: false,
         canRaisePO: false,
         canConfirmDeliveries: false,
         canRunAudits: false,
         canLogMachineHours: false,
+      },
+    });
+
+    const employee = await this.prisma.employee.upsert({
+      where: { id: 'EMP-SYS-0001' },
+      update: { roleId: role.id },
+      create: {
+        id: 'EMP-SYS-0001',
+        fullName: 'System',
+        employeeId: 'SYS0001',
+        contact: 'system@veims.local',
+        department: 'ADM',
+        status: 'ACTIVE',
+        joinDate: new Date(),
+        roleId: role.id,
       },
     });
 

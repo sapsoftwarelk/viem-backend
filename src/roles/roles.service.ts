@@ -24,10 +24,6 @@ export class RolesService {
     canConfirmDeliveries?: boolean;
     canRunAudits?: boolean;
     canLogMachineHours?: boolean;
-    position_title?: string;
-    level?: string;
-    status?: string;
-    description?: string;
   }) {
     return this.prisma.role.create({ data });
   }

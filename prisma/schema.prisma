@@ -38,14 +38,18 @@ model SubCategory {
 // ---------------------------------------------------------
 
 model Employee {
-  id           String   @id // Format: EMP-DRV-0001
-  name         String
+  id           String   @id @default(uuid())
+  fullName     String   @default("")
   employeeId   String   @unique
   photoUrl     String?
   contact      String
   department   String   // ADM, INV, SITE, DRV, REP, FIN
+  status       String   @default("ACTIVE")
+  joinDate     DateTime @default(now())
+  roleId       String?
+  role         Role?    @relation(fields: [roleId], references: [id])
   createdAt    DateTime @default(now())
-  
+
   // Relation to system user (optional - not all employees use the system)
   user         User?
 }
@@ -81,6 +85,7 @@ model Role {
   canLogMachineHours   Boolean @default(false)
 
   users                User[]
+  employees            Employee[]
 }
 
 // ---------------------------------------------------------
