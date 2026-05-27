@@ -363,3 +363,25 @@ model MovementHistory {
   location  String
   timestamp DateTime @default(now())
 }
+
+model Task {
+  id          String      @id @default(uuid())
+  title       String
+  description String?
+  priority    TaskPriority @default(Medium)
+  status      TaskStatus   @default(Active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum TaskPriority {
+  Low
+  Medium
+  High
+  Urgent
+}
+
+enum TaskStatus {
+  Active
+  Inactive
+}

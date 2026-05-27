@@ -24,10 +24,11 @@ export class RolesService {
     canConfirmDeliveries?: boolean;
     canRunAudits?: boolean;
     canLogMachineHours?: boolean;
+    position_title?: string;
+    level?: string;
+    status?: string;
+    description?: string;
   }) {
-    const createData: any = { ...data };
-    // Ensure `name` is not sent to DB (schema no longer has `name`).
-    delete createData.name;
-    return this.prisma.role.create({ data: createData });
+    return this.prisma.role.create({ data });
   }
 }

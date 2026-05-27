@@ -34,22 +34,18 @@ export class UsersService implements OnModuleInit {
       },
     });
 
-    let role = await this.prisma.role.findFirst({ where: { position_title: 'Super Admin' } });
-    if (!role) {
-      role = await this.prisma.role.create({
-        data: {
-          position_title: 'Super Admin',
-          level: 'admin',
-          status: 'active',
-          description: 'System super administrator',
-          canCreateUsers: true,
-          canRaisePO: true,
-          canConfirmDeliveries: true,
-          canRunAudits: true,
-          canLogMachineHours: true,
-        },
-      });
-    }
+    const role = await this.prisma.role.upsert({
+      where: { name: 'SUPER_ADMIN' },
+      update: {},
+      create: {
+        name: 'SUPER_ADMIN',
+        canCreateUsers: true,
+        canRaisePO: true,
+        canConfirmDeliveries: true,
+        canRunAudits: true,
+        canLogMachineHours: true,
+      },
+    });
 
     const hashedPassword = await bcrypt.hash('admin123', 10);
 
@@ -116,7 +112,8 @@ export class UsersService implements OnModuleInit {
         roleId: data.roleId,
         isActive: data.isActive ?? true,
       },
-      include: { // ✅ Add this to return related data
+      include: {
+        // ✅ Add this to return related data
         employee: true,
         role: true,
       },
@@ -145,7 +142,8 @@ export class UsersService implements OnModuleInit {
     return this.prisma.user.update({
       where: { id },
       data: updateData,
-      include: { // ✅ Add this to return related data
+      include: {
+        // ✅ Add this to return related data
         employee: true,
         role: true,
       },

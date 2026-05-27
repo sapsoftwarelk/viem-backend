@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocType, GINItemType, GINStatus, ToolStatus } from '@prisma/client';
 import { toDataURL } from 'qrcode';
@@ -50,13 +54,20 @@ export class GoodsIssueNotesService {
 
     for (const item of dto.items) {
       if (item.quantity <= 0) {
-        throw new BadRequestException('Item quantity must be greater than zero');
+        throw new BadRequestException(
+          'Item quantity must be greater than zero',
+        );
       }
 
       if (item.itemType === 'TOOL') {
-        const tool = await this.prisma.tool.findUnique({ where: { id: item.itemId } });
+        const tool = await this.prisma.tool.findUnique({
+          where: { id: item.itemId },
+        });
         if (!tool) throw new NotFoundException('Tool not found');
-        const availableForDispatch = [ToolStatus.IN_WAREHOUSE, ToolStatus.READY];
+        const availableForDispatch = [
+          ToolStatus.IN_WAREHOUSE,
+          ToolStatus.READY,
+        ];
         if (!availableForDispatch.includes(tool.status as any)) {
           throw new BadRequestException('Tool is not available for dispatch');
         }
@@ -71,7 +82,9 @@ export class GoodsIssueNotesService {
           }),
         );
       } else if (item.itemType === 'REUSABLE') {
-        const reusable = await this.prisma.reusableItem.findUnique({ where: { id: item.itemId } });
+        const reusable = await this.prisma.reusableItem.findUnique({
+          where: { id: item.itemId },
+        });
         if (!reusable) throw new NotFoundException('Reusable item not found');
         items.push(
           await this.prisma.goodsIssueNoteItem.create({
@@ -85,7 +98,9 @@ export class GoodsIssueNotesService {
         );
       } else if (item.itemType === 'CONSUMABLE') {
         if (!item.itemId && !item.subCategoryId) {
-          throw new BadRequestException('Consumable items need itemId or subCategoryId for FIFO selection');
+          throw new BadRequestException(
+            'Consumable items need itemId or subCategoryId for FIFO selection',
+          );
         }
 
         if (item.overrideFIFO && !item.fifoOverrideReason) {
@@ -93,18 +108,23 @@ export class GoodsIssueNotesService {
         }
 
         if (item.itemId) {
-          const batch = await this.prisma.consumableBatch.findUnique({ where: { id: item.itemId } });
+          const batch = await this.prisma.consumableBatch.findUnique({
+            where: { id: item.itemId },
+          });
           if (!batch || batch.status !== 'AVAILABLE') {
             throw new NotFoundException('Consumable batch not available');
           }
           if (batch.quantity < item.quantity) {
-            throw new BadRequestException('Insufficient quantity in selected batch');
+            throw new BadRequestException(
+              'Insufficient quantity in selected batch',
+            );
           }
           const updatedBatch = await this.prisma.consumableBatch.update({
             where: { id: item.itemId },
             data: {
               quantity: { decrement: item.quantity },
-              status: batch.quantity - item.quantity <= 0 ? 'DEPLETED' : batch.status,
+              status:
+                batch.quantity - item.quantity <= 0 ? 'DEPLETED' : batch.status,
             },
           });
           items.push(
@@ -122,13 +142,19 @@ export class GoodsIssueNotesService {
             }),
           );
         } else {
-          const selections = await this.selectConsumableBatches(item.subCategoryId!, item.quantity);
+          const selections = await this.selectConsumableBatches(
+            item.subCategoryId!,
+            item.quantity,
+          );
           for (const selection of selections) {
             const updatedBatch = await this.prisma.consumableBatch.update({
               where: { id: selection.batch.id },
               data: {
                 quantity: { decrement: selection.quantity },
-                status: selection.batch.quantity - selection.quantity <= 0 ? 'DEPLETED' : selection.batch.status,
+                status:
+                  selection.batch.quantity - selection.quantity <= 0
+                    ? 'DEPLETED'
+                    : selection.batch.status,
               },
             });
             items.push(
@@ -184,10 +210,16 @@ export class GoodsIssueNotesService {
   async markReady(id: string) {
     const gin = await this.findOne(id);
     if (gin.status !== GINStatus.DRAFT) {
-      throw new BadRequestException('GIN can only be moved to READY from DRAFT');
+      throw new BadRequestException(
+        'GIN can only be moved to READY from DRAFT',
+      );
     }
 
-    const qrPayload = JSON.stringify({ type: 'GIN', id, timestamp: new Date().toISOString() });
+    const qrPayload = JSON.stringify({
+      type: 'GIN',
+      id,
+      timestamp: new Date().toISOString(),
+    });
     const qrCodeDataUrl = await toDataURL(qrPayload);
 
     const result = await this.prisma.goodsIssueNote.update({
@@ -251,11 +283,18 @@ export class GoodsIssueNotesService {
 
   async scanGINItem(ginId: string, itemId: string, scanQty = 1) {
     const gin = await this.findOne(ginId);
-    if (gin.status !== GINStatus.IN_TRANSIT && gin.status !== GINStatus.DELIVERED) {
-      throw new BadRequestException('Items may only be scanned while GIN is in transit or at delivery');
+    if (
+      gin.status !== GINStatus.IN_TRANSIT &&
+      gin.status !== GINStatus.DELIVERED
+    ) {
+      throw new BadRequestException(
+        'Items may only be scanned while GIN is in transit or at delivery',
+      );
     }
 
-    const item = await this.prisma.goodsIssueNoteItem.findUnique({ where: { id: itemId } });
+    const item = await this.prisma.goodsIssueNoteItem.findUnique({
+      where: { id: itemId },
+    });
     if (!item || item.ginId !== ginId) {
       throw new NotFoundException('GIN item not found');
     }
@@ -277,12 +316,16 @@ export class GoodsIssueNotesService {
       throw new BadRequestException('GIN must be IN_TRANSIT before delivery');
     }
 
-    const items = await this.prisma.goodsIssueNoteItem.findMany({ where: { ginId: id } });
+    const items = await this.prisma.goodsIssueNoteItem.findMany({
+      where: { ginId: id },
+    });
     if (items.length === 0) {
       throw new BadRequestException('GIN has no items to deliver');
     }
 
-    const hasMismatch = items.some((item) => item.scannedCount !== item.quantity);
+    const hasMismatch = items.some(
+      (item) => item.scannedCount !== item.quantity,
+    );
     const newStatus = hasMismatch ? GINStatus.DISCREPANCY : GINStatus.DELIVERED;
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
@@ -296,7 +339,11 @@ export class GoodsIssueNotesService {
       data: { status: hasMismatch ? 'DISCREPANCY' : 'DELIVERED' },
     });
     if (!hasMismatch) {
-      await this.updateToolStatusesForGINItems(id, ToolStatus.ON_SITE, gin.siteLocationId || undefined);
+      await this.updateToolStatusesForGINItems(
+        id,
+        ToolStatus.ON_SITE,
+        gin.siteLocationId || undefined,
+      );
     }
     return result;
   }
@@ -304,7 +351,9 @@ export class GoodsIssueNotesService {
   async reportDiscrepancy(id: string) {
     const gin = await this.findOne(id);
     if (gin.status !== GINStatus.DELIVERED) {
-      throw new BadRequestException('Discrepancy can only be reported after delivery');
+      throw new BadRequestException(
+        'Discrepancy can only be reported after delivery',
+      );
     }
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
@@ -319,12 +368,23 @@ export class GoodsIssueNotesService {
     return result;
   }
 
-  async overrideFIFO(ginId: string, itemId: string, approverId: string, reason: string) {
+  async overrideFIFO(
+    ginId: string,
+    itemId: string,
+    approverId: string,
+    reason: string,
+  ) {
     if (!reason) {
       throw new BadRequestException('FIFO override reason is required');
     }
-    const item = await this.prisma.goodsIssueNoteItem.findUnique({ where: { id: itemId } });
-    if (!item || item.ginId !== ginId || item.itemType !== GINItemType.CONSUMABLE) {
+    const item = await this.prisma.goodsIssueNoteItem.findUnique({
+      where: { id: itemId },
+    });
+    if (
+      !item ||
+      item.ginId !== ginId ||
+      item.itemType !== GINItemType.CONSUMABLE
+    ) {
       throw new NotFoundException('Consumable GIN item not found');
     }
     return this.prisma.goodsIssueNoteItem.update({
@@ -340,19 +400,33 @@ export class GoodsIssueNotesService {
 
   async returnConsumable(ginId: string, itemId: string, quantity: number) {
     const gin = await this.findOne(ginId);
-    if (gin.status !== GINStatus.RETURNING && gin.status !== GINStatus.RTN_TRANSIT) {
-      throw new BadRequestException('Consumable returns are only allowed during return workflows');
+    if (
+      gin.status !== GINStatus.RETURNING &&
+      gin.status !== GINStatus.RTN_TRANSIT
+    ) {
+      throw new BadRequestException(
+        'Consumable returns are only allowed during return workflows',
+      );
     }
-    const item = await this.prisma.goodsIssueNoteItem.findUnique({ where: { id: itemId } });
-    if (!item || item.ginId !== ginId || item.itemType !== GINItemType.CONSUMABLE) {
+    const item = await this.prisma.goodsIssueNoteItem.findUnique({
+      where: { id: itemId },
+    });
+    if (
+      !item ||
+      item.ginId !== ginId ||
+      item.itemType !== GINItemType.CONSUMABLE
+    ) {
       throw new NotFoundException('Consumable GIN item not found');
     }
     if (quantity <= 0 || quantity > item.quantity) {
       throw new BadRequestException('Invalid return quantity');
     }
 
-    const batch = await this.prisma.consumableBatch.findUnique({ where: { id: item.consumableId! } });
-    if (!batch) throw new NotFoundException('Original consumable batch not found');
+    const batch = await this.prisma.consumableBatch.findUnique({
+      where: { id: item.consumableId! },
+    });
+    if (!batch)
+      throw new NotFoundException('Original consumable batch not found');
 
     await this.prisma.consumableBatch.update({
       where: { id: batch.id },
@@ -372,8 +446,13 @@ export class GoodsIssueNotesService {
 
   async initiateReturn(id: string) {
     const gin = await this.findOne(id);
-    if (gin.status !== GINStatus.DELIVERED && gin.status !== GINStatus.DISCREPANCY) {
-      throw new BadRequestException('Return can only be initiated after delivery or discrepancy');
+    if (
+      gin.status !== GINStatus.DELIVERED &&
+      gin.status !== GINStatus.DISCREPANCY
+    ) {
+      throw new BadRequestException(
+        'Return can only be initiated after delivery or discrepancy',
+      );
     }
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
@@ -392,7 +471,9 @@ export class GoodsIssueNotesService {
   async startReturnTransit(id: string) {
     const gin = await this.findOne(id);
     if (gin.status !== GINStatus.RETURNING) {
-      throw new BadRequestException('Return transit can only start after return is initiated');
+      throw new BadRequestException(
+        'Return transit can only start after return is initiated',
+      );
     }
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
@@ -411,7 +492,9 @@ export class GoodsIssueNotesService {
   async receiveAtWarehouse(id: string) {
     const gin = await this.findOne(id);
     if (gin.status !== GINStatus.RTN_TRANSIT) {
-      throw new BadRequestException('Warehouse receive can only happen after return transit');
+      throw new BadRequestException(
+        'Warehouse receive can only happen after return transit',
+      );
     }
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
@@ -429,8 +512,13 @@ export class GoodsIssueNotesService {
 
   async close(id: string) {
     const gin = await this.findOne(id);
-    if (gin.status !== GINStatus.DELIVERED && gin.status !== GINStatus.RECEIVED_AT_WH) {
-      throw new BadRequestException('GIN can only be closed after delivery or warehouse receipt');
+    if (
+      gin.status !== GINStatus.DELIVERED &&
+      gin.status !== GINStatus.RECEIVED_AT_WH
+    ) {
+      throw new BadRequestException(
+        'GIN can only be closed after delivery or warehouse receipt',
+      );
     }
     const result = await this.prisma.goodsIssueNote.update({
       where: { docId: id },
@@ -448,7 +536,10 @@ export class GoodsIssueNotesService {
     return result;
   }
 
-  private async selectConsumableBatches(subCategoryId: number, quantity: number) {
+  private async selectConsumableBatches(
+    subCategoryId: number,
+    quantity: number,
+  ) {
     const now = new Date();
     const batches = await this.prisma.consumableBatch.findMany({
       where: {
@@ -473,13 +564,19 @@ export class GoodsIssueNotesService {
     }
 
     if (remaining > 0) {
-      throw new BadRequestException('Not enough consumable quantity available to fulfill FIFO selection');
+      throw new BadRequestException(
+        'Not enough consumable quantity available to fulfill FIFO selection',
+      );
     }
 
     return selections;
   }
 
-  private async updateToolStatusesForGINItems(ginId: string, status: ToolStatus, locationId?: string) {
+  private async updateToolStatusesForGINItems(
+    ginId: string,
+    status: ToolStatus,
+    locationId?: string,
+  ) {
     const toolItems = await this.prisma.goodsIssueNoteItem.findMany({
       where: { ginId, itemType: GINItemType.TOOL },
     });
@@ -495,7 +592,10 @@ export class GoodsIssueNotesService {
         data.locationId = locationId;
       }
 
-      if (status === ToolStatus.IN_TRANSIT || status === ToolStatus.RECEIVED_AT_WH) {
+      if (
+        status === ToolStatus.IN_TRANSIT ||
+        status === ToolStatus.RECEIVED_AT_WH
+      ) {
         data.locationId = null;
       }
 
@@ -530,19 +630,18 @@ export class GoodsIssueNotesService {
       },
     });
 
-    let role = await this.prisma.role.findFirst({ where: { position_title: 'System' } });
-    if (!role) {
-      role = await this.prisma.role.create({
-        data: {
-          position_title: 'System',
-          canCreateUsers: false,
-          canRaisePO: false,
-          canConfirmDeliveries: false,
-          canRunAudits: false,
-          canLogMachineHours: false,
-        },
-      });
-    }
+    const role = await this.prisma.role.upsert({
+      where: { name: 'System' },
+      update: {},
+      create: {
+        name: 'System',
+        canCreateUsers: false,
+        canRaisePO: false,
+        canConfirmDeliveries: false,
+        canRunAudits: false,
+        canLogMachineHours: false,
+      },
+    });
 
     return this.prisma.user.create({
       data: {
@@ -602,7 +701,11 @@ export class GoodsIssueNotesService {
         type: DocType.EXN,
         createdAt: {
           gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+          lt: new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() + 1,
+          ),
         },
       },
     });
@@ -617,7 +720,11 @@ export class GoodsIssueNotesService {
         type: DocType.GIN,
         createdAt: {
           gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+          lt: new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() + 1,
+          ),
         },
       },
     });
@@ -632,7 +739,11 @@ export class GoodsIssueNotesService {
         type: DocType.LMR,
         createdAt: {
           gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+          lt: new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() + 1,
+          ),
         },
       },
     });

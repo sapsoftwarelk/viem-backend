@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocType } from '@prisma/client';
 
@@ -43,19 +47,18 @@ export class PurchaseOrdersService {
       });
 
       // Create dummy role
-      let role = await this.prisma.role.findFirst({ where: { position_title: 'Test Role' } });
-      if (!role) {
-        role = await this.prisma.role.create({
-            data: {
-              position_title: 'Test Role',
-            canCreateUsers: false,
-            canRaisePO: true,
-            canConfirmDeliveries: false,
-            canRunAudits: false,
-            canLogMachineHours: false,
-          },
-        });
-      }
+      const role = await this.prisma.role.upsert({
+        where: { name: 'Test Role' },
+        update: {},
+        create: {
+          name: 'Test Role',
+          canCreateUsers: false,
+          canRaisePO: true,
+          canConfirmDeliveries: false,
+          canRunAudits: false,
+          canLogMachineHours: false,
+        },
+      });
 
       // Create dummy user
       user = await this.prisma.user.create({
@@ -69,9 +72,14 @@ export class PurchaseOrdersService {
       });
     }
     // Validate total cost matches items
-    const calculatedTotal = dto.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const calculatedTotal = dto.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
     if (Math.abs(calculatedTotal - dto.totalCost) > 0.01) {
-      throw new BadRequestException('Total cost does not match item calculations');
+      throw new BadRequestException(
+        'Total cost does not match item calculations',
+      );
     }
 
     // Generate PO ID
@@ -230,7 +238,11 @@ export class PurchaseOrdersService {
         type: DocType.PO,
         createdAt: {
           gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+          lt: new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() + 1,
+          ),
         },
       },
     });
