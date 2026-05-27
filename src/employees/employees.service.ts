@@ -14,12 +14,14 @@ export class EmployeesService {
   }
 
   create(data: {
-    id: string;
-    name: string;
+    fullName: string;
     employeeId: string;
     contact: string;
     department: string;
     photoUrl?: string;
+    status?: string;
+    joinDate?: Date;
+    roleId?: string;
   }) {
     return this.prisma.employee.create({ data });
   }
@@ -27,11 +29,14 @@ export class EmployeesService {
   update(
     id: string,
     data: {
-      name?: string;
+      fullName?: string;
       employeeId?: string;
       contact?: string;
       department?: string;
       photoUrl?: string;
+      status?: string;
+      joinDate?: Date;
+      roleId?: string;
     },
   ) {
     return this.prisma.employee.update({ where: { id }, data });

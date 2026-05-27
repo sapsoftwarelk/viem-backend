@@ -19,7 +19,11 @@ export class RolesController {
   create(
     @Body()
     body: {
-      name: string;
+      position_title: string;
+      level: string;
+      status: string;
+      description: string;
+
       canCreateUsers?: boolean;
       canRaisePO?: boolean;
       canConfirmDeliveries?: boolean;

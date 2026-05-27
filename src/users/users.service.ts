@@ -22,32 +22,34 @@ export class UsersService implements OnModuleInit {
 
     console.log('🌱 Creating Super Admin...');
 
-    const employee = await this.prisma.employee.upsert({
-      where: { id: 'EMP-SUPER-001' },
-      update: {},
-      create: {
-        id: 'EMP-SUPER-001',
-        name: 'Super Admin',
-        employeeId: 'SUPER-ADMIN',
-        contact: '0000000000',
-        department: 'ADMIN',
-      },
-    });
-
     const role = await this.prisma.role.upsert({
-      where: { name: 'SUPER_ADMIN' },
+      where: { position_title: 'Super Admin' },
       update: {},
       create: {
-        name: 'SUPER_ADMIN',
         position_title: 'Super Admin',
-        level: 'ADMIN',
-        status: 'ACTIVE',
-        description: 'Super administrator with full permissions',
+        level: 'admin',
+        status: 'active',
+        description: 'System super administrator',
         canCreateUsers: true,
         canRaisePO: true,
         canConfirmDeliveries: true,
         canRunAudits: true,
         canLogMachineHours: true,
+      },
+    });
+
+    const employee = await this.prisma.employee.upsert({
+      where: { id: 'EMP-SUPER-001' },
+      update: { roleId: role.id },
+      create: {
+        id: 'EMP-SUPER-001',
+        fullName: 'Super Admin',
+        employeeId: 'SUPER-ADMIN',
+        contact: '0000000000',
+        department: 'ADMIN',
+        status: 'ACTIVE',
+        joinDate: new Date(),
+        roleId: role.id,
       },
     });
 
@@ -116,7 +118,8 @@ export class UsersService implements OnModuleInit {
         roleId: data.roleId,
         isActive: data.isActive ?? true,
       },
-      include: { // ✅ Add this to return related data
+      include: {
+        // ✅ Add this to return related data
         employee: true,
         role: true,
       },
@@ -145,7 +148,8 @@ export class UsersService implements OnModuleInit {
     return this.prisma.user.update({
       where: { id },
       data: updateData,
-      include: { // ✅ Add this to return related data
+      include: {
+        // ✅ Add this to return related data
         employee: true,
         role: true,
       },

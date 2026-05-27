@@ -37,14 +37,18 @@ model SubCategory {
 // ---------------------------------------------------------
 
 model Employee {
-  id           String   @id // Format: EMP-DRV-0001
-  name         String
+  id           String   @id @default(uuid())
+  fullName     String   @default("")
   employeeId   String   @unique
   photoUrl     String?
   contact      String
   department   String   // ADM, INV, SITE, DRV, REP, FIN
+  status       String   @default("ACTIVE")
+  joinDate     DateTime @default(now())
+  roleId       String?
+  role         Role?    @relation(fields: [roleId], references: [id])
   createdAt    DateTime @default(now())
-  
+
   // Relation to system user (optional - not all employees use the system)
   user         User?
 }
@@ -67,11 +71,10 @@ model User {
 
 model Role {
   id                   String  @id @default(uuid())
-  name                 String  @unique // Driver, Technical Officer, CEO
-  position_title       String
-  level                String
-  status               String
-  description          String
+  position_title       String  @unique @default("")
+  level                String  @default("")
+  status               String  @default("active")
+  description          String  @default("")
   
   // Permission Matrix (16 flags)
   canCreateUsers       Boolean @default(false)
@@ -81,6 +84,7 @@ model Role {
   canLogMachineHours   Boolean @default(false)
 
   users                User[]
+  employees            Employee[]
 }
 
 // ---------------------------------------------------------

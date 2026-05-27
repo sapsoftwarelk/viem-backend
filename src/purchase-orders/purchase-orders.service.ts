@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocType } from '@prisma/client';
 
@@ -30,33 +34,31 @@ export class PurchaseOrdersService {
     let user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       // Create dummy employee first
-      const employee = await this.prisma.employee.upsert({
-        where: { id: 'EMP-INV-0001' },
-        update: {},
-        create: {
-          id: 'EMP-INV-0001',
-          name: 'Test User',
-          employeeId: 'EMP001',
-          contact: 'test@example.com',
-          department: 'INV',
-        },
-      });
-
-      // Create dummy role
       const role = await this.prisma.role.upsert({
-        where: { name: 'Test Role' },
+        where: { position_title: 'Test Role' },
         update: {},
         create: {
-          name: 'Test Role',
           position_title: 'Test Role',
-          level: 'TEST',
-          status: 'ACTIVE',
-          description: 'Temporary test role for purchase order flows',
           canCreateUsers: false,
           canRaisePO: true,
           canConfirmDeliveries: false,
           canRunAudits: false,
           canLogMachineHours: false,
+        },
+      });
+
+      const employee = await this.prisma.employee.upsert({
+        where: { id: 'EMP-INV-0001' },
+        update: { roleId: role.id },
+        create: {
+          id: 'EMP-INV-0001',
+          fullName: 'Test User',
+          employeeId: 'EMP001',
+          contact: 'test@example.com',
+          department: 'INV',
+          status: 'ACTIVE',
+          joinDate: new Date(),
+          roleId: role.id,
         },
       });
 
@@ -72,9 +74,14 @@ export class PurchaseOrdersService {
       });
     }
     // Validate total cost matches items
-    const calculatedTotal = dto.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const calculatedTotal = dto.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
     if (Math.abs(calculatedTotal - dto.totalCost) > 0.01) {
-      throw new BadRequestException('Total cost does not match item calculations');
+      throw new BadRequestException(
+        'Total cost does not match item calculations',
+      );
     }
 
     // Generate PO ID
@@ -233,7 +240,11 @@ export class PurchaseOrdersService {
         type: DocType.PO,
         createdAt: {
           gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+          lt: new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate() + 1,
+          ),
         },
       },
     });

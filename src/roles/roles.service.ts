@@ -14,30 +14,17 @@ export class RolesService {
   }
 
   create(data: {
-    name: string;
+    position_title: string;
+    level: string;
+    status: string;
+    description: string;
+
     canCreateUsers?: boolean;
     canRaisePO?: boolean;
     canConfirmDeliveries?: boolean;
     canRunAudits?: boolean;
     canLogMachineHours?: boolean;
-    position_title?: string;
-    level?: string;
-    status?: string;
-    description?: string;
   }) {
-    return this.prisma.role.create({
-      data: {
-        name: data.name,
-        position_title: data.position_title ?? data.name,
-        level: data.level ?? 'STANDARD',
-        status: data.status ?? 'ACTIVE',
-        description: data.description ?? `${data.name} role`,
-        canCreateUsers: data.canCreateUsers ?? false,
-        canRaisePO: data.canRaisePO ?? false,
-        canConfirmDeliveries: data.canConfirmDeliveries ?? false,
-        canRunAudits: data.canRunAudits ?? false,
-        canLogMachineHours: data.canLogMachineHours ?? false,
-      },
-    });
+    return this.prisma.role.create({ data });
   }
 }
