@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { DocType } from '@prisma/client';
+import { DocType, ToolStatus, ConsumableBatchStatus } from '@prisma/client';
 
 export interface CreateGRNDto {
   poId: string;
@@ -14,12 +14,23 @@ export interface CreateGRNDto {
 export interface GRNItem {
   type: 'tool' | 'consumable' | 'reusable';
   subCategoryId: number;
-  quantity: number;
-  model?: string;
+  itemName: string;
+  description?: string;
+  status?: string;
+  locationId?: string;
+  supplier?: string;
+  purchaseDate?: Date;
+  warrantyExpiry?: Date;
+  quantity?: number;
+  maxHours?: number;
   serialNumber?: string;
+  bladeType?: string;
+  batchDate?: Date;
+  unit?: string;
   expiryDate?: Date;
   bundleId?: string;
-  maxHours?: number;
+  pieceCount?: number;
+  individualTracking?: boolean;
 }
 
 export interface CreatedItem {
@@ -86,20 +97,31 @@ export class GoodsReceivedNotesService {
     const createdItems: CreatedItem[] = [];
     for (const item of dto.items) {
       if (item.type === 'tool') {
-        const toolId = await this.generateToolId(item.subCategoryId);
-        const tool = await this.prisma.tool.create({
-          data: {
-            id: toolId,
-            subCategoryId: item.subCategoryId,
-            model: item.model || '',
-            serialNumber: item.serialNumber || '',
-            purchaseDate: new Date(),
-            condition: 'NEW',
-            maxHours: item.maxHours || 0,
-            grnId: grnId,
-          },
-        });
-        createdItems.push({ type: 'tool', item: tool });
+        const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+        for (let index = 0; index < quantity; index++) {
+          const toolId = await this.generateToolId(item.subCategoryId);
+          const tool = await this.prisma.tool.create({
+            data: {
+              id: toolId,
+              subCategoryId: item.subCategoryId,
+              itemName: item.itemName,
+              model: item.itemName,
+              description: item.description,
+              supplier: item.supplier,
+              purchaseDate: item.purchaseDate ?? new Date(),
+              warrantyExpiry: item.warrantyExpiry,
+              quantity: item.quantity,
+              bladeType: item.bladeType,
+              serialNumber: item.serialNumber || '',
+              condition: 'NEW',
+              maxHours: item.maxHours || 0,
+              status: item.status ? item.status as any : undefined,
+              locationId: item.locationId,
+              grnId: grnId,
+            },
+          });
+          createdItems.push({ type: 'tool', item: tool });
+        }
       } else if (item.type === 'consumable') {
         const batchId = await this.generateConsumableBatchId(
           item.subCategoryId,
@@ -108,22 +130,40 @@ export class GoodsReceivedNotesService {
           data: {
             id: batchId,
             subCategoryId: item.subCategoryId,
+            itemName: item.itemName,
+            description: item.description,
+            supplier: item.supplier,
+            purchaseDate: item.purchaseDate ?? new Date(),
+            batchDate: item.batchDate,
             receivedDate: new Date(),
             expiryDate:
               item.expiryDate ||
               new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year default
-            quantity: item.quantity,
+            quantity: item.quantity || 0,
+            unit: item.unit,
+            status: item.status ? (item.status as ConsumableBatchStatus) : undefined,
+            locationId: item.locationId,
             grnId: grnId,
           },
         });
         createdItems.push({ type: 'consumable', item: batch });
       } else if (item.type === 'reusable') {
-        const reusableId = await this.generateReusableId(item.bundleId!);
+        const reusableId = await this.generateReusableId(
+          item.bundleId || item.itemName,
+        );
         const reusable = await this.prisma.reusableItem.create({
           data: {
             id: reusableId,
-            bundleId: item.bundleId!,
-            pieceNum: 1, // Will need to handle multiple pieces
+            bundleId: item.bundleId || item.itemName,
+            itemName: item.itemName,
+            description: item.description,
+            supplier: item.supplier,
+            purchaseDate: item.purchaseDate ?? new Date(),
+            status: item.status,
+            locationId: item.locationId,
+            pieceCount: item.pieceCount || 1,
+            individualTracking: item.individualTracking ?? false,
+            pieceNum: item.pieceCount || 1,
             grnId: grnId,
           },
         });

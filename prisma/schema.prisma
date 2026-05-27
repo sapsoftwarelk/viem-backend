@@ -96,9 +96,15 @@ model Tool {
   id              String   @id // Format: TOOL-DRL-0001
   subCategoryId   Int
   subCategory     SubCategory @relation(fields: [subCategoryId], references: [id])
+  itemName        String?
   model           String
+  description     String?
+  supplier        String?
+  purchaseDate    DateTime?
+  warrantyExpiry  DateTime?
+  quantity        Int?
+  bladeType       String?
   serialNumber    String   @unique
-  purchaseDate    DateTime
   condition       String
   
   // Machine Hours
@@ -150,13 +156,19 @@ model ConsumableBatch {
   id              String   @id // Format: CONS-CEM-2026-04-29-001
   subCategoryId   Int
   subCategory     SubCategory @relation(fields: [subCategoryId], references: [id])
+  itemName        String?
+  description     String?
+  supplier        String?
+  purchaseDate    DateTime?
+  batchDate       DateTime?
   receivedDate    DateTime @default(now()) // For FIFO
   expiryDate      DateTime
   quantity        Float    
+  unit            String?
   status          ConsumableBatchStatus @default(AVAILABLE)
-  originalBatchId String?  // For partial returns to preserve FIFO
   locationId      String?
   location        SiteLocation? @relation(fields: [locationId], references: [id])
+  originalBatchId String?  // For partial returns to preserve FIFO
   
   // Link to GRN that created this batch
   grnId           String?
@@ -167,13 +179,22 @@ model ConsumableBatch {
 }
 
 model ReusableItem {
-  id       String @id // Format: REUS-SCF-0001-P003
-  bundleId String
-  pieceNum Int
+  id                 String   @id // Format: REUS-SCF-0001-P003
+  bundleId           String
+  itemName           String?
+  description        String?
+  supplier           String?
+  purchaseDate       DateTime?
+  status             String?
+  locationId         String?
+  location           SiteLocation? @relation(fields: [locationId], references: [id])
+  pieceCount         Int?     
+  individualTracking Boolean? @default(false)
+  pieceNum           Int
   
   // Link to GRN that created this item
-  grnId    String?
-  grn      GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
+  grnId              String?
+  grn                GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
 
   goodsIssueNoteItems GoodsIssueNoteItem[]
 }
@@ -186,6 +207,7 @@ model SiteLocation {
   originTrips        LorryMovementRecord[] @relation("LmrOriginLocation")
   destinationTrips   LorryMovementRecord[] @relation("LmrDestinationLocation")
   goodsIssueNotes     GoodsIssueNote[]
+  reusableItems      ReusableItem[]
 }
 
 // ---------------------------------------------------------

@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { GoodsReceivedNotesModule } from './goods-received-notes/goods-received-notes.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { GoodsIssueNotesModule } from './goods-issue-notes/goods-issue-notes.module';
+import { ItemsModule } from './items/items.module';
 import { RolesModule } from './roles/roles.module';
 import { AuthModule } from './auth/auth.module';
 import { EmployeesModule } from './employees/employees.module';
@@ -25,6 +26,7 @@ import { TasksModule } from './tasks/tasks.module';
     GoodsReceivedNotesModule,
     PurchaseOrdersModule,
     GoodsIssueNotesModule,
+    ItemsModule,
     RolesModule,
     EmployeesModule,
     TasksModule,
