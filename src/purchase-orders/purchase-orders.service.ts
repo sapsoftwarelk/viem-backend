@@ -39,6 +39,9 @@ export class PurchaseOrdersService {
         update: {},
         create: {
           position_title: 'Test Role',
+          level: 'TEST',
+          status: 'active',
+          description: 'Test role',
           canCreateUsers: false,
           canRaisePO: true,
           canConfirmDeliveries: false,

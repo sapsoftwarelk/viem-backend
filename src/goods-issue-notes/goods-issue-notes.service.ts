@@ -623,6 +623,9 @@ export class GoodsIssueNotesService {
       update: {},
       create: {
         position_title: 'System',
+        level: 'SYSTEM',
+        status: 'active',
+        description: 'System role',
         canCreateUsers: false,
         canRaisePO: false,
         canConfirmDeliveries: false,

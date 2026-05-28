@@ -31,6 +31,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$connect();
     // Backfill roles: copy `name` to `position_title` when empty.
     try {
+      if (!(await this.columnExists('role', 'position_title'))) {
+        // Skip backfill if the database schema has not been migrated yet.
+        // This is expected when the application is running against an older DB.
+        // eslint-disable-next-line no-console
+        console.warn('Role backfill skipped: database does not contain role.position_title');
+        return;
+      }
+
       const roles = await this.role.findMany();
       for (const r of roles) {
         if ((!r.position_title || r.position_title === '') && (r as any).name) {
@@ -43,6 +51,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       // eslint-disable-next-line no-console
       console.warn('Role backfill skipped or failed:', e?.message ?? e);
     }
+  }
+
+  private async columnExists(table: string, column: string): Promise<boolean> {
+    const result = await this.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE lower(table_name) = lower(${table})
+        AND lower(column_name) = lower(${column})
+    `;
+    return result.length > 0;
   }
 
   async onModuleDestroy() {
