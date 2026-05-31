@@ -6,10 +6,12 @@ export type ItemType = 'tool' | 'consumable' | 'reusable';
 
 export interface CreateItemDto {
   type: ItemType;
-  subCategoryId: number;
+  subCategoryId?: number;
+  subCategoryCode?: string;
   itemName: string;
   description?: string;
   status?: string;
+  location?: string;
   locationId?: string;
   supplier?: string;
   purchaseDate?: Date;
@@ -36,28 +38,30 @@ export class ItemsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateItemDto) {
+    const subCategoryId = await this.resolveSubCategoryId(data.subCategoryId, data.subCategoryCode);
     if (data.type === 'tool') {
       const quantity = data.quantity && data.quantity > 0 ? data.quantity : 1;
       const createdTools: any[] = [];
+      const locationId = data.locationId || await this.resolveLocation(data.location);
+
       for (let index = 0; index < quantity; index++) {
-        const toolId = await this.generateToolId(data.subCategoryId);
+        const toolId = await this.generateToolId(subCategoryId);
         const tool = await this.prisma.tool.create({
           data: {
             id: toolId,
-            subCategoryId: data.subCategoryId,
+            subCategoryId,
             itemName: data.itemName,
             model: data.itemName,
             description: data.description,
             supplier: data.supplier,
             purchaseDate: data.purchaseDate ?? new Date(),
             warrantyExpiry: data.warrantyExpiry,
-            quantity: data.quantity,
             bladeType: data.bladeType,
-            serialNumber: data.serialNumber || '',
-            condition: 'NEW',
+            serialNumber: data.serialNumber || toolId,
+            condition: 'PROCURED',
             maxHours: data.maxHours || 0,
-            status: data.status ? (data.status as ToolStatus) : undefined,
-            locationId: data.locationId,
+            status: this.mapToolStatus(data.status) ?? ToolStatus.IN_WAREHOUSE,
+            locationId,
           },
         });
         createdTools.push(tool);
@@ -66,11 +70,12 @@ export class ItemsService {
     }
 
     if (data.type === 'consumable') {
-      const batchId = await this.generateConsumableBatchId(data.subCategoryId);
+      const locationId = data.locationId || await this.resolveLocation(data.location);
+      const batchId = await this.generateConsumableBatchId(subCategoryId);
       const batch = await this.prisma.consumableBatch.create({
         data: {
           id: batchId,
-          subCategoryId: data.subCategoryId,
+          subCategoryId,
           itemName: data.itemName,
           description: data.description,
           supplier: data.supplier,
@@ -80,29 +85,30 @@ export class ItemsService {
           expiryDate: data.expiryDate ?? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
           quantity: data.quantity || 0,
           unit: data.unit,
-          status: data.status ? (data.status as ConsumableBatchStatus) : undefined,
-          locationId: data.locationId,
+          status: this.mapConsumableStatus(data.status) ?? ConsumableBatchStatus.AVAILABLE,
+          locationId,
         },
       });
       return { type: 'consumable', item: batch };
     }
 
     if (data.type === 'reusable') {
+      const locationId = data.locationId || await this.resolveLocation(data.location);
       const bundleId = data.bundleId || data.itemName;
       const reusableId = await this.generateReusableId(bundleId);
       const reusable = await this.prisma.reusableItem.create({
         data: {
           id: reusableId,
-          bundleId,
           itemName: data.itemName,
+          subCategoryId,
+          bundleId,
           description: data.description,
           supplier: data.supplier,
           purchaseDate: data.purchaseDate ?? new Date(),
           status: data.status,
-          locationId: data.locationId,
-          pieceCount: data.pieceCount || 1,
-          individualTracking: data.individualTracking ?? false,
+          locationId,
           pieceNum: data.pieceCount || 1,
+          individualTracking: data.individualTracking ?? false,
         },
       });
       return { type: 'reusable', item: reusable };
@@ -115,7 +121,7 @@ export class ItemsService {
     const [tools, consumables, reusables] = await Promise.all([
       this.prisma.tool.findMany({ include: { subCategory: true, location: true } }),
       this.prisma.consumableBatch.findMany({ include: { subCategory: true, location: true } }),
-      this.prisma.reusableItem.findMany({ include: { location: true } }),
+      this.prisma.reusableItem.findMany({ include: { subCategory: true, location: true } }),
     ]);
 
     return [
@@ -147,7 +153,7 @@ export class ItemsService {
     if (id.startsWith('REUS-')) {
       const reusable = await this.prisma.reusableItem.findUnique({
         where: { id },
-        include: { location: true },
+        include: { subCategory: true, location: true },
       });
       if (!reusable) throw new NotFoundException('Reusable item not found');
       return { type: 'reusable', item: reusable };
@@ -192,5 +198,71 @@ export class ItemsService {
     const count = await this.prisma.reusableItem.count({ where: { bundleId } });
     const sequence = (count + 1).toString().padStart(3, '0');
     return `REUS-${bundleId}-P${sequence}`;
+  }
+
+  private mapToolStatus(status?: string): ToolStatus | undefined {
+    if (!status) return undefined;
+    const normalized = status.toUpperCase().replace(/\s+/g, '_');
+    switch (normalized) {
+      case 'PROCURED': return ToolStatus.PROCURED;
+      case 'IN_WAREHOUSE':
+      case 'IN WAREHOUSE':
+      case 'ACTIVE':
+        return ToolStatus.IN_WAREHOUSE;
+      case 'READY': return ToolStatus.READY;
+      case 'IN_TRANSIT':
+      case 'IN TRANSIT': return ToolStatus.IN_TRANSIT;
+      case 'ON_SITE':
+      case 'ON SITE':
+      case 'IN_USE':
+      case 'IN USE': return ToolStatus.ON_SITE;
+      case 'RETURN_INITIATED':
+      case 'RETURN INITIATED':
+      case 'RETURNING': return ToolStatus.RETURNING;
+      case 'RECEIVED_AT_WH':
+      case 'RECEIVED AT WH': return ToolStatus.RECEIVED_AT_WH;
+      case 'DAMAGED': return ToolStatus.DAMAGED;
+      case 'IN_REPAIR':
+      case 'IN REPAIR': return ToolStatus.IN_REPAIR;
+      case 'INSPECTION': return ToolStatus.INSPECTION;
+      case 'SCRAPPED': return ToolStatus.SCRAPPED;
+      default: return undefined;
+    }
+  }
+
+  private mapConsumableStatus(status?: string): ConsumableBatchStatus | undefined {
+    if (!status) return undefined;
+    const normalized = status.toUpperCase().replace(/\s+/g, '_');
+    switch (normalized) {
+      case 'AVAILABLE':
+      case 'ACTIVE': return ConsumableBatchStatus.AVAILABLE;
+      case 'DEPLETED':
+      case 'OUT_OF_STOCK':
+      case 'OUT OF STOCK': return ConsumableBatchStatus.DEPLETED;
+      case 'EXPIRED': return ConsumableBatchStatus.EXPIRED;
+      default: return undefined;
+    }
+  }
+
+  private async resolveSubCategoryId(subCategoryId?: number, subCategoryCode?: string): Promise<number> {
+    if (subCategoryId) return subCategoryId;
+    if (!subCategoryCode) {
+      throw new BadRequestException('subCategoryId or subCategoryCode is required');
+    }
+    const normalizedCode = subCategoryCode.trim().toUpperCase();
+    const category = await this.prisma.subCategory.findUnique({ where: { code: normalizedCode } });
+    if (!category) {
+      throw new NotFoundException(`SubCategory with code ${subCategoryCode} not found`);
+    }
+    return category.id;
+  }
+
+  private async resolveLocation(location?: string): Promise<string | undefined> {
+    if (!location) return undefined;
+    const existing = await this.prisma.siteLocation.findFirst({ where: { siteName: location } });
+    if (existing) return existing.id;
+    const id = `SITE-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const created = await this.prisma.siteLocation.create({ data: { id, siteName: location } });
+    return created.id;
   }
 }

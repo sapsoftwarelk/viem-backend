@@ -27,4 +27,26 @@ export class RolesService {
   }) {
     return this.prisma.role.create({ data });
   }
+
+  update(
+    id: string,
+    data: {
+      position_title?: string;
+      level?: string;
+      status?: string;
+      description?: string;
+
+      canCreateUsers?: boolean;
+      canRaisePO?: boolean;
+      canConfirmDeliveries?: boolean;
+      canRunAudits?: boolean;
+      canLogMachineHours?: boolean;
+    },
+  ) {
+    return this.prisma.role.update({ where: { id }, data });
+  }
+
+  remove(id: string) {
+    return this.prisma.role.delete({ where: { id } });
+  }
 }

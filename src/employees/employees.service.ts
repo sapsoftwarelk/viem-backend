@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -13,32 +14,11 @@ export class EmployeesService {
     return this.prisma.employee.findUnique({ where: { id } });
   }
 
-  create(data: {
-    fullName: string;
-    employeeId: string;
-    contact: string;
-    department: string;
-    photoUrl?: string;
-    status?: string;
-    joinDate?: Date;
-    roleId?: string;
-  }) {
+  create(data: Prisma.EmployeeUncheckedCreateInput) {
     return this.prisma.employee.create({ data });
   }
 
-  update(
-    id: string,
-    data: {
-      fullName?: string;
-      employeeId?: string;
-      contact?: string;
-      department?: string;
-      photoUrl?: string;
-      status?: string;
-      joinDate?: Date;
-      roleId?: string;
-    },
-  ) {
+  update(id: string, data: Prisma.EmployeeUncheckedUpdateInput) {
     return this.prisma.employee.update({ where: { id }, data });
   }
 

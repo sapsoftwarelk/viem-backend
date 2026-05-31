@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { RolesService } from './roles.service';
 
 @Controller('roles')
@@ -32,5 +32,30 @@ export class RolesController {
     },
   ) {
     return this.rolesService.create(body);
+  }
+
+  @Put(':id')
+  update(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      position_title?: string;
+      level?: string;
+      status?: string;
+      description?: string;
+
+      canCreateUsers?: boolean;
+      canRaisePO?: boolean;
+      canConfirmDeliveries?: boolean;
+      canRunAudits?: boolean;
+      canLogMachineHours?: boolean;
+    },
+  ) {
+    return this.rolesService.update(id, body);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.rolesService.remove(id);
   }
 }

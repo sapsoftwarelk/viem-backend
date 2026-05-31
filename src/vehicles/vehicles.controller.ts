@@ -32,7 +32,7 @@ export class VehiclesController {
   create(
     @Body()
     body: {
-      id: string;
+      id?: string;
 
       registrationNo: string;
       category: string;

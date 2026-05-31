@@ -28,7 +28,9 @@ model SubCategory {
 
   // Relations to actual items
   tools       Tool[]
+  vehicles    Vehicle[]
   consumables ConsumableBatch[]
+  reusableItems ReusableItem[]
   createdAt   DateTime @default(now())
 }
 
@@ -37,20 +39,19 @@ model SubCategory {
 // ---------------------------------------------------------
 
 model Employee {
-  id           String   @id @default(uuid())
-  fullName     String   @default("")
-  employeeId   String   @unique
-  photoUrl     String?
-  contact      String
-  department   String   // ADM, INV, SITE, DRV, REP, FIN
-  status       String   @default("ACTIVE")
-  joinDate     DateTime @default(now())
-  roleId       String?
-  role         Role?    @relation(fields: [roleId], references: [id])
-  createdAt    DateTime @default(now())
+  id         String   @id // Format: EMP-DRV-0001
+  fullName   String   @map("name")
+  employeeId String   @unique
+  photoUrl   String?
+  contact    String
+  department String   // ADM, INV, SITE, DRV, REP, FIN
+  status     String   @default("ACTIVE")
+  joinDate   DateTime @default(now())
+  roleId     String?
+  role       Role?    @relation(fields: [roleId], references: [id])
+  createdAt  DateTime @default(now())
 
-  // Relation to system user (optional - not all employees use the system)
-  user         User?
+  user User?
 }
 
 model User {
@@ -70,22 +71,22 @@ model User {
 }
 
 model Role {
-  id                   String  @id @default(uuid())
-  position_title       String  @unique @default("")
-  level                String  @default("")
-  status               String  @default("active")
-  description          String  @default("")
-  
-  // Permission Matrix (16 flags)
+  id             String @id @default(uuid())
+  position_title String @unique
+  level          String @default("")
+  status         String @default("active")
+  description    String @default("")
+
   canCreateUsers       Boolean @default(false)
   canRaisePO           Boolean @default(false)
   canConfirmDeliveries Boolean @default(false)
   canRunAudits         Boolean @default(false)
   canLogMachineHours   Boolean @default(false)
 
-  users                User[]
-  employees            Employee[]
+  users     User[]
+  employees Employee[]
 }
+
 
 // ---------------------------------------------------------
 // 3. Assets & Inventory
@@ -101,7 +102,6 @@ model Tool {
   supplier        String?
   purchaseDate    DateTime?
   warrantyExpiry  DateTime?
-  quantity        Int?
   bladeType       String?
   serialNumber    String   @unique
   condition       String
@@ -139,33 +139,21 @@ enum ToolStatus {
 }
 
 model Vehicle {
-  id                    String   @id // Format: VEH-LRY-0001
-
-  // Vehicle Details
-  registrationNo        String   @unique
-  category              String
-
-  make                  String
-  model                 String
-
-  year                  Int
-  color                 String
-
-  fuelType              String
-
-  status                String   @default("Active")
-
-  notes                 String?
-
-  // Compliance Dates
-  insuranceExpiry       DateTime
-  registrationExpiry    DateTime
-
-  // Relations
-  trips                 LorryMovementRecord[]
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                 String   @id // Format: VEH-LRY-0001
+  registrationNo     String   @unique
+  category           String
+  make               String
+  model              String
+  year               Int
+  color              String
+  fuelType           String
+  status             String   @default("Active")
+  notes              String?
+  insuranceExpiry    DateTime
+  registrationExpiry DateTime
+  subCategoryId      Int
+  subCategory        SubCategory @relation(fields: [subCategoryId], references: [id])
+  trips              LorryMovementRecord[]
 }
 
 enum ConsumableBatchStatus {
@@ -178,7 +166,7 @@ model ConsumableBatch {
   id              String   @id // Format: CONS-CEM-2026-04-29-001
   subCategoryId   Int
   subCategory     SubCategory @relation(fields: [subCategoryId], references: [id])
-  itemName        String?
+  itemName        String
   description     String?
   supplier        String?
   purchaseDate    DateTime?
@@ -188,9 +176,9 @@ model ConsumableBatch {
   quantity        Float    
   unit            String?
   status          ConsumableBatchStatus @default(AVAILABLE)
+  originalBatchId String?  // For partial returns to preserve FIFO
   locationId      String?
   location        SiteLocation? @relation(fields: [locationId], references: [id])
-  originalBatchId String?  // For partial returns to preserve FIFO
   
   // Link to GRN that created this batch
   grnId           String?
@@ -202,21 +190,22 @@ model ConsumableBatch {
 
 model ReusableItem {
   id                 String   @id // Format: REUS-SCF-0001-P003
-  bundleId           String
   itemName           String?
+  subCategoryId      Int?
+  subCategory        SubCategory? @relation(fields: [subCategoryId], references: [id])
+  bundleId           String
   description        String?
   supplier           String?
   purchaseDate       DateTime?
   status             String?
   locationId         String?
   location           SiteLocation? @relation(fields: [locationId], references: [id])
-  pieceCount         Int?     
-  individualTracking Boolean? @default(false)
   pieceNum           Int
+  individualTracking Boolean? @default(false)
   
   // Link to GRN that created this item
-  grnId              String?
-  grn                GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
+  grnId    String?
+  grn      GoodsReceivedNote? @relation(fields: [grnId], references: [docId])
 
   goodsIssueNoteItems GoodsIssueNoteItem[]
 }
@@ -226,10 +215,10 @@ model SiteLocation {
   siteName           String
   tools              Tool[]
   consumables        ConsumableBatch[]
+  reusableItems      ReusableItem[]
   originTrips        LorryMovementRecord[] @relation("LmrOriginLocation")
   destinationTrips   LorryMovementRecord[] @relation("LmrDestinationLocation")
   goodsIssueNotes     GoodsIssueNote[]
-  reusableItems      ReusableItem[]
 }
 
 // ---------------------------------------------------------
@@ -250,6 +239,15 @@ model Document {
   ginDetails      GoodsIssueNote?
   lmrDetails      LorryMovementRecord?
   exnDetails      ExpiryNote?
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  priority    String?
+  status      String?
+  createdAt   DateTime @default(now())
 }
 
 enum DocType {
@@ -411,26 +409,4 @@ model MovementHistory {
   tool      Tool     @relation(fields: [toolId], references: [id])
   location  String
   timestamp DateTime @default(now())
-}
-
-model Task {
-  id          String      @id @default(uuid())
-  title       String
-  description String?
-  priority    TaskPriority @default(Medium)
-  status      TaskStatus   @default(Active)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-}
-
-enum TaskPriority {
-  Low
-  Medium
-  High
-  Urgent
-}
-
-enum TaskStatus {
-  Active
-  Inactive
 }
