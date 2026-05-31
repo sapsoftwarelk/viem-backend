@@ -213,6 +213,17 @@ model ReusableItem {
 model SiteLocation {
   id                 String   @id // Format: SITE-COL-0001-A-L3-S2
   siteName           String
+  region             String   @default("")
+  seq                Int      @default(1)
+  status             String   @default("Planning")
+  client             String   @default("")
+  contactNumber      String   @default("")
+  address            String   @default("")
+  startDate          DateTime?
+  remarks            String   @default("")
+  subLevels          Json     @default("[]")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
   tools              Tool[]
   consumables        ConsumableBatch[]
   reusableItems      ReusableItem[]
