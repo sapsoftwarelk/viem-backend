@@ -15,10 +15,16 @@ export class EmployeesService {
   }
 
   create(data: Prisma.EmployeeUncheckedCreateInput) {
+    if (typeof data.joinDate === 'string' && data.joinDate.trim() !== '') {
+      data.joinDate = new Date(data.joinDate);
+    }
     return this.prisma.employee.create({ data });
   }
 
   update(id: string, data: Prisma.EmployeeUncheckedUpdateInput) {
+    if (typeof data.joinDate === 'string' && data.joinDate.trim() !== '') {
+      data.joinDate = new Date(data.joinDate);
+    }
     return this.prisma.employee.update({ where: { id }, data });
   }
 

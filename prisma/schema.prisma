@@ -39,7 +39,7 @@ model SubCategory {
 // ---------------------------------------------------------
 
 model Employee {
-  id         String   @id // Format: EMP-DRV-0001
+  id         String   @id @default(uuid()) // Format: EMP-DRV-0001
   fullName   String   @map("name")
   employeeId String   @unique
   photoUrl   String?
