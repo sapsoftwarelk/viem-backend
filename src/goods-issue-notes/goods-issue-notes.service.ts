@@ -548,9 +548,7 @@ export class GoodsIssueNotesService {
         expiryDate: { gte: now },
         quantity: { gt: 0 },
       },
-      orderBy: {
-        receivedDate: 'asc',
-      },
+      orderBy: [{ expiryDate: 'asc' }, { receivedDate: 'asc' }],
     });
 
     let remaining = quantity;
@@ -565,7 +563,7 @@ export class GoodsIssueNotesService {
 
     if (remaining > 0) {
       throw new BadRequestException(
-        'Not enough consumable quantity available to fulfill FIFO selection',
+        'Not enough consumable quantity available to fulfill FEFO selection',
       );
     }
 
