@@ -39,17 +39,18 @@ model SubCategory {
 // ---------------------------------------------------------
 
 model Employee {
-  id         String   @id @default(uuid()) // Format: EMP-DRV-0001
-  fullName   String   @map("name")
-  employeeId String   @unique
-  photoUrl   String?
-  contact    String
-  department String   // ADM, INV, SITE, DRV, REP, FIN
-  status     String   @default("ACTIVE")
-  joinDate   DateTime @default(now())
-  roleId     String?
-  role       Role?    @relation(fields: [roleId], references: [id])
-  createdAt  DateTime @default(now())
+  id            String   @id @default(uuid()) // Format: EMP-DRV-0001
+  fullName      String   @map("name")
+  employeeId    String   @unique
+  photoUrl      String?
+  contact       String
+  department    String   // ADM, INV, SITE, DRV, REP, FIN
+  status        String   @default("ACTIVE")
+  employmentType String  @default("Permanent") // Permanent, Temporary, Contract
+  joinDate      DateTime @default(now())
+  roleId        String?
+  role          Role?    @relation(fields: [roleId], references: [id])
+  createdAt     DateTime @default(now())
 
   user User?
 }
