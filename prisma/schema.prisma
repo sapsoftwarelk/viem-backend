@@ -258,8 +258,8 @@ model Task {
   id          String   @id @default(uuid())
   title       String
   description String?
-  priority    String?
-  status      String?
+  priority    String   @default("Medium")
+  status      String?  @default("active")
   createdAt   DateTime @default(now())
 }
 
