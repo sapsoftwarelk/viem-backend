@@ -213,6 +213,7 @@ model ReusableItem {
 model SiteLocation {
   id                 String   @id // Format: SITE-COL-0001-A-L3-S2
   siteName           String
+  manager            String   @default("")
   region             String   @default("")
   seq                Int      @default(1)
   status             String   @default("Planning")

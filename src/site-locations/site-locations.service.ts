@@ -11,6 +11,7 @@ export type SiteSubLevel = {
 
 export type CreateSiteLocationDto = {
   siteName: string;
+  manager?: string;
   region: string;
   status?: string;
   client?: string;
@@ -53,6 +54,7 @@ export class SiteLocationsService {
       data: {
         id,
         siteName: data.siteName.trim(),
+        manager: data.manager?.trim() || '',
         region,
         seq,
         status: data.status || 'Planning',
@@ -73,6 +75,7 @@ export class SiteLocationsService {
       where: { id },
       data: {
         siteName: data.siteName?.trim(),
+        manager: data.manager?.trim(),
         region: data.region?.trim(),
         seq: data.seq,
         status: data.status,

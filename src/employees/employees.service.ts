@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -18,7 +19,13 @@ export class EmployeesService {
     if (typeof data.joinDate === 'string' && data.joinDate.trim() !== '') {
       data.joinDate = new Date(data.joinDate);
     }
-    return this.prisma.employee.create({ data });
+
+    const createData = { ...data } as Prisma.EmployeeUncheckedCreateInput;
+    if (!createData.id) {
+      createData.id = randomUUID();
+    }
+
+    return this.prisma.employee.create({ data: createData });
   }
 
   update(id: string, data: Prisma.EmployeeUncheckedUpdateInput) {
