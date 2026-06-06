@@ -232,6 +232,18 @@ model SiteLocation {
   originTrips        LorryMovementRecord[] @relation("LmrOriginLocation")
   destinationTrips   LorryMovementRecord[] @relation("LmrDestinationLocation")
   goodsIssueNotes     GoodsIssueNote[]
+  managerHistory      SiteManagerHistory[]
+}
+
+model SiteManagerHistory {
+  id        String       @id @default(uuid())
+  siteId    String
+  site      SiteLocation @relation(fields: [siteId], references: [id])
+  manager   String
+  fromDate  DateTime
+  toDate    DateTime?
+  changedAt DateTime     @default(now())
+  changedBy String?
 }
 
 // ---------------------------------------------------------

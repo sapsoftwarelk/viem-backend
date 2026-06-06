@@ -32,12 +32,24 @@ export class SiteLocationsService {
 
   findAll() {
     return this.prisma.siteLocation.findMany({
+      include: {
+        managerHistory: {
+          orderBy: { fromDate: 'asc' },
+        },
+      },
       orderBy: [{ createdAt: 'desc' }],
     });
   }
 
   async findOne(id: string) {
-    const site = await this.prisma.siteLocation.findUnique({ where: { id } });
+    const site = await this.prisma.siteLocation.findUnique({
+      where: { id },
+      include: {
+        managerHistory: {
+          orderBy: { fromDate: 'asc' },
+        },
+      },
+    });
     if (!site) throw new NotFoundException('Site location not found');
     return site;
   }
@@ -50,42 +62,89 @@ export class SiteLocationsService {
     const seq = await this.nextSequence(region);
     const id = this.generateSiteId(region, seq);
 
+    const manager = data.manager?.trim() || '';
+    const startDate = data.startDate ? this.parseDate(data.startDate, 'startDate') : undefined;
+
     return this.prisma.siteLocation.create({
       data: {
         id,
         siteName: data.siteName.trim(),
-        manager: data.manager?.trim() || '',
+        manager,
         region,
         seq,
         status: data.status || 'Planning',
         client: data.client || '',
         contactNumber: data.contactNumber || '',
         address: data.address || '',
-        startDate: data.startDate ? this.parseDate(data.startDate, 'startDate') : undefined,
+        startDate,
         remarks: data.remarks || '',
         subLevels: data.subLevels || [],
+        managerHistory: manager
+          ? {
+              create: {
+                manager,
+                fromDate: startDate || new Date(),
+                changedBy: 'System',
+              },
+            }
+          : undefined,
+      },
+      include: {
+        managerHistory: {
+          orderBy: { fromDate: 'asc' },
+        },
       },
     });
   }
 
   async update(id: string, data: UpdateSiteLocationDto) {
-    await this.findOne(id);
+    const currentSite = await this.findOne(id);
+    const nextManager =
+      data.manager === undefined ? undefined : data.manager.trim();
+    const managerChanged =
+      nextManager !== undefined && nextManager !== currentSite.manager;
 
-    return this.prisma.siteLocation.update({
-      where: { id },
-      data: {
-        siteName: data.siteName?.trim(),
-        manager: data.manager?.trim(),
-        region: data.region?.trim(),
-        seq: data.seq,
-        status: data.status,
-        client: data.client,
-        contactNumber: data.contactNumber,
-        address: data.address,
-        startDate: data.startDate ? this.parseDate(data.startDate, 'startDate') : undefined,
-        remarks: data.remarks,
-        subLevels: data.subLevels,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      if (managerChanged) {
+        const now = new Date();
+        await tx.siteManagerHistory.updateMany({
+          where: { siteId: id, toDate: null },
+          data: { toDate: now },
+        });
+
+        if (nextManager) {
+          await tx.siteManagerHistory.create({
+            data: {
+              siteId: id,
+              manager: nextManager,
+              fromDate: now,
+              changedBy: 'Admin',
+            },
+          });
+        }
+      }
+
+      return tx.siteLocation.update({
+        where: { id },
+        data: {
+          siteName: data.siteName?.trim(),
+          manager: nextManager,
+          region: data.region?.trim(),
+          seq: data.seq,
+          status: data.status,
+          client: data.client,
+          contactNumber: data.contactNumber,
+          address: data.address,
+          startDate: data.startDate ? this.parseDate(data.startDate, 'startDate') : undefined,
+          remarks: data.remarks,
+          subLevels: data.subLevels,
+        },
+        include: {
+          managerHistory: {
+            orderBy: { fromDate: 'asc' },
+          },
+        },
+      });
     });
   }
 
