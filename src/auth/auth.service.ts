@@ -31,13 +31,21 @@ export class AuthService {
 
   async login(user: any) {
     const payload = { sub: user.id, username: user.username };
+    const token = this.jwtService.sign(payload);
+
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: token,
+      token,
+      accessToken: token,
+      message: 'Login successful',
       user: {
         id: user.id,
         username: user.username,
         employeeId: user.employeeId,
-        role: user.role,
+        role: {
+          ...user.role,
+          name: user.role.position_title,
+        },
       },
     };
   }

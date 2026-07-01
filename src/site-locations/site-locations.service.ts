@@ -12,7 +12,7 @@ export type SiteSubLevel = {
 export type CreateSiteLocationDto = {
   siteName: string;
   manager?: string;
-  region: string;
+  region?: string;
   status?: string;
   client?: string;
   contactNumber?: string;
@@ -56,9 +56,8 @@ export class SiteLocationsService {
 
   async create(data: CreateSiteLocationDto) {
     if (!data.siteName?.trim()) throw new BadRequestException('siteName is required');
-    if (!data.region?.trim()) throw new BadRequestException('region is required');
 
-    const region = data.region.trim();
+    const region = this.inferRegion(data);
     const seq = await this.nextSequence(region);
     const id = this.generateSiteId(region, seq);
 
@@ -151,6 +150,14 @@ export class SiteLocationsService {
   async remove(id: string) {
     await this.findOne(id);
     return this.prisma.siteLocation.delete({ where: { id } });
+  }
+
+  private inferRegion(data: CreateSiteLocationDto): string {
+    const candidates = [data.region, data.address, data.siteName, 'General']
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter(Boolean);
+
+    return candidates[0] || 'General';
   }
 
   private async nextSequence(region: string): Promise<number> {

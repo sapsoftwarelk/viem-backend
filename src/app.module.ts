@@ -14,6 +14,7 @@ import { UsersModule } from './users/users.module';
 import { TasksModule } from './tasks/tasks.module';
 import { VehiclesModule } from './vehicles/vehicles.module';
 import { SiteLocationsModule } from './site-locations/site-locations.module';
+import { FrontendFallbacksModule } from './frontend-fallbacks/frontend-fallbacks.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { SiteLocationsModule } from './site-locations/site-locations.module';
     TasksModule,
     VehiclesModule,
     SiteLocationsModule,
+    FrontendFallbacksModule,
   ],
 })
 export class AppModule {}
