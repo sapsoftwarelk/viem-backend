@@ -5,7 +5,23 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CategoriesService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
+  private readonly defaultCategories = [
+    { name: 'Tools', slug: 'tools' },
+    { name: 'Reusable', slug: 'reusable' },
+    { name: 'Consumables', slug: 'consumable' },
+  ];
+
+  private async ensureDefaultCategories() {
+    for (const category of this.defaultCategories) {
+      const existing = await this.prisma.category.findFirst({ where: { slug: category.slug } });
+      if (!existing) {
+        await this.prisma.category.create({ data: category });
+      }
+    }
+  }
+
+  async findAll() {
+    await this.ensureDefaultCategories();
     return this.prisma.category.findMany({ include: { subCategories: true } });
   }
 
@@ -13,7 +29,8 @@ export class CategoriesService {
     return this.prisma.category.findUnique({ where: { id } });
   }
 
-  create(data: { name: string; slug: string }) {
+  async create(data: { name: string; slug: string }) {
+    await this.ensureDefaultCategories();
     return this.prisma.category.create({ data });
   }
 

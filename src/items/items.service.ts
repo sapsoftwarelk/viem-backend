@@ -249,12 +249,52 @@ export class ItemsService {
     if (!subCategoryCode) {
       throw new BadRequestException('subCategoryId or subCategoryCode is required');
     }
-    const normalizedCode = subCategoryCode.trim().toUpperCase();
-    const category = await this.prisma.subCategory.findUnique({ where: { code: normalizedCode } });
-    if (!category) {
-      throw new NotFoundException(`SubCategory with code ${subCategoryCode} not found`);
+
+    const rawCode = subCategoryCode.trim();
+    const normalizedCode = rawCode.toUpperCase();
+    const slug = rawCode
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'subcategory';
+
+    const existingCategory = await this.prisma.subCategory.findFirst({
+      where: {
+        OR: [
+          { code: normalizedCode },
+          { code: { equals: rawCode, mode: 'insensitive' } },
+          { slug: { equals: slug, mode: 'insensitive' } },
+          { name: { equals: rawCode, mode: 'insensitive' } },
+        ],
+      },
+    });
+
+    if (existingCategory) {
+      return existingCategory.id;
     }
-    return category.id;
+
+    let defaultCategory = await this.prisma.category.findFirst({
+      where: { slug: 'general' },
+    });
+
+    if (!defaultCategory) {
+      defaultCategory = await this.prisma.category.create({
+        data: {
+          name: 'General',
+          slug: 'general',
+        },
+      });
+    }
+
+    const createdCategory = await this.prisma.subCategory.create({
+      data: {
+        name: normalizedCode,
+        slug,
+        code: normalizedCode,
+        categoryId: defaultCategory.id,
+      },
+    });
+
+    return createdCategory.id;
   }
 
   private async resolveLocation(location?: string): Promise<string | undefined> {
