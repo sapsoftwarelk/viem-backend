@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards, Request } from '@nestjs/common';
-import { GoodsReceivedNotesService } from './goods-received-notes.service';
+import { GoodsReceivedNotesService, CreateGRNDto } from './goods-received-notes.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import type { CreateGRNDto } from './goods-received-notes.service';
 
 @Controller('goods-received-notes')
 @UseGuards(JwtAuthGuard)

@@ -6,11 +6,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { DocType, ToolStatus, ConsumableBatchStatus } from '@prisma/client';
 
-export interface CreateGRNDto {
-  poId: string;
-  items: GRNItem[];
-}
-
 export interface GRNItem {
   type: 'tool' | 'consumable' | 'reusable';
   subCategoryId: number;
@@ -33,6 +28,11 @@ export interface GRNItem {
   individualTracking?: boolean;
 }
 
+export class CreateGRNDto {
+  poId!: string;
+  items!: GRNItem[];
+}
+
 export interface CreatedItem {
   type: string;
   item: any; // Tool | ConsumableBatch | ReusableItem
@@ -40,7 +40,7 @@ export interface CreatedItem {
 
 @Injectable()
 export class GoodsReceivedNotesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async createGRN(userId: string, dto: CreateGRNDto) {
     // Verify PO exists and is approved
@@ -114,7 +114,7 @@ export class GoodsReceivedNotesService {
               serialNumber: item.serialNumber || '',
               condition: 'NEW',
               maxHours: item.maxHours || 0,
-              status: item.status ? item.status as any : undefined,
+              status: item.status ? (item.status as ToolStatus) : undefined,
               locationId: item.locationId,
               grnId: grnId,
             },
@@ -178,7 +178,7 @@ export class GoodsReceivedNotesService {
 
   private async generateGRNId(): Promise<string> {
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '-');
+    const dateStr = today.toISOString().split('T')[0];
     const count = await this.prisma.document.count({
       where: {
         type: DocType.GRN,
@@ -218,7 +218,7 @@ export class GoodsReceivedNotesService {
     if (!subCategory) throw new NotFoundException('SubCategory not found');
 
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '-');
+    const dateStr = today.toISOString().split('T')[0];
     const count = await this.prisma.consumableBatch.count({
       where: {
         subCategoryId,
@@ -377,7 +377,7 @@ export class GoodsReceivedNotesService {
         },
       },
     });
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '-');
+    const dateStr = today.toISOString().split('T')[0];
     return `EXN-${dateStr}-${(count + 1).toString().padStart(3, '0')}`;
   }
 }
