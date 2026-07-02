@@ -1,16 +1,8 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { URL } from 'node:url';
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not defined');
-}
-
-const adapter = new PrismaPg(connectionString);
-const prisma = new PrismaClient({ adapter });
+// සරල සහ වේගවත් සෘජු දත්ත සම්බන්ධතාවය සඳහා සාමාන්‍ය Prisma Client එක භාවිතය
+const prisma = new PrismaClient();
 
 async function main() {
   console.log('Starting seed...');
@@ -28,7 +20,7 @@ async function main() {
   // ============================================
   // TOOLS CATEGORY
   // ============================================
-  const toolsCategory = await prisma.category.create({
+  await prisma.category.create({
     data: {
       name: 'Tools',
       slug: 'tools',
@@ -54,7 +46,7 @@ async function main() {
   // ============================================
   // REUSABLE CATEGORY
   // ============================================
-  const reusableCategory = await prisma.category.create({
+  await prisma.category.create({
     data: {
       name: 'Reusable',
       slug: 'reusable',
@@ -76,7 +68,7 @@ async function main() {
   // ============================================
   // CONSUMABLE CATEGORY
   // ============================================
-  const consumableCategory = await prisma.category.create({
+  await prisma.category.create({
     data: {
       name: 'Consumable',
       slug: 'consumable',
