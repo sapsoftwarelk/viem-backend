@@ -5,19 +5,18 @@ import { PrismaService } from '../prisma/prisma.service';
 export class PurchaseOrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * 1. නව Purchase Order එකක් නිර්මාණය කිරීම
-   */
   async createPurchaseOrder(dto: any, creatorId: string) {
-    const poId = dto.docId;
+    const poId = (typeof dto?.docId === 'string' && dto.docId.trim() !== '') 
+      ? dto.docId 
+      : `PO-${Date.now()}`; 
 
     return await this.prisma.document.create({
       data: {
         id: poId,
-        type: 'PO', // DocType Enum
+        type: 'PO',
         status: 'PENDING',
         isAdminApproved: false,
-        creatorId: creatorId, // Links to User
+        creatorId: creatorId,
         poDetails: {
           create: {
             supplier: dto.supplier,
@@ -32,17 +31,13 @@ export class PurchaseOrdersService {
     });
   }
 
-  /**
-   * 2. සියලුම Purchase Orders ලබා ගැනීම (findAll)
-   * Document වගුවෙන් PO වර්ගයේ සියලුම වාර්තා සහ ඒවායේ poDetails ලබා ගනී.
-   */
   async findAll() {
     return await this.prisma.document.findMany({
       where: {
-        type: 'PO', // DocType Enum[cite: 3]
+        type: 'PO', 
       },
       include: {
-        poDetails: true,
+        poDetails: true, // Retaining valid schema relation
         creator: {
           select: {
             id: true,
@@ -62,9 +57,6 @@ export class PurchaseOrdersService {
     });
   }
 
-  /**
-   * 3. අනුමැතිය අපේක්ෂිත (Pending) Purchase Orders පමණක් ලබා ගැනීම (findPendingApproval)
-   */
   async findPendingApproval() {
     return await this.prisma.document.findMany({
       where: {
@@ -81,14 +73,11 @@ export class PurchaseOrdersService {
         },
       },
       orderBy: {
-        createdAt: 'asc', // පැරණි ඒවා මුලින්ම පෙන්වීමට
+        createdAt: 'asc',
       },
     });
   }
 
-  /**
-   * 4. ID එකක් මඟින් නිශ්චිත Purchase Order එකක් සොයා ගැනීම (findOne)
-   */
   async findOne(id: string) {
     const po = await this.prisma.document.findUnique({
       where: { id },
@@ -100,7 +89,6 @@ export class PurchaseOrdersService {
             username: true,
           },
         },
-        grnDetails: true, // සබඳතා පරීක්ෂාව සඳහා[cite: 3]
       },
     });
 
@@ -111,11 +99,8 @@ export class PurchaseOrdersService {
     return po;
   }
 
-  /**
-   * 5. Purchase Order එකක් ප්‍රතික්ෂේප කිරීම
-   */
   async rejectPurchaseOrder(poId: string) {
-    await this.findOne(poId); // පවතින්නේදැයි තහවුරු කරගැනීම
+    await this.findOne(poId);
 
     return await this.prisma.document.update({
       where: { id: poId },
@@ -129,11 +114,8 @@ export class PurchaseOrdersService {
     });
   }
 
-  /**
-   * 6. Purchase Order එකක් අනුමත කිරීම
-   */
   async approvePurchaseOrder(poId: string) {
-    await this.findOne(poId); // පවතින්නේදැයි තහවුරු කරගැනීම
+    await this.findOne(poId);
 
     return await this.prisma.document.update({
       where: { id: poId },
