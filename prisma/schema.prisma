@@ -233,6 +233,8 @@ model SiteLocation {
   destinationTrips   LorryMovementRecord[] @relation("LmrDestinationLocation")
   goodsIssueNotes     GoodsIssueNote[]
   managerHistory      SiteManagerHistory[]
+  purchaseOrders      PurchaseOrder[]     
+
 }
 
 model SiteManagerHistory {
@@ -301,15 +303,35 @@ enum GINItemType {
 }
 
 model PurchaseOrder {
-  docId        String   @id
-  document     Document @relation(fields: [docId], references: [id])
-  supplier     String
-  totalCost    Float
-  expectedDate DateTime
-  
-  // Link to GRN when received
-  grn          GoodsReceivedNote?
-}
+     docId          String        @id
+     supplier       String
+     siteLocationId String?
+     siteLocation   SiteLocation? @relation(fields: [siteLocationId], references: [id])
+     totalCost      Float
+     expectedDate   DateTime
+     document       Document      @relation(fields: [docId], references: [id])
+     items          PurchaseOrderItem[]
+     grn            GoodsReceivedNote?
+   }
+
+   model PurchaseOrderItem {
+     id            String        @id @default(uuid())
+     poId          String
+     purchaseOrder PurchaseOrder @relation(fields: [poId], references: [docId], onDelete: Cascade)
+
+     itemId        String?
+     description   String
+     type          String?
+     categoryCode  String?
+     unit          String?
+
+     quantity      Float
+     receivedQty   Float      @default(0)
+     unitPrice     Float
+     subCategoryId Int?
+
+     @@index([poId])
+   }
 
 model GoodsReceivedNote {
   docId         String   @id
