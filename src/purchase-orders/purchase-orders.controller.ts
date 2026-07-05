@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Delete, UseGuards, Request } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -40,5 +40,10 @@ export class PurchaseOrdersController {
   @Patch(':id/reject')
   async reject(@Param('id') id: string) {
     return this.poService.rejectPurchaseOrder(id);
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    return this.poService.deletePurchaseOrder(id);
   }
 }

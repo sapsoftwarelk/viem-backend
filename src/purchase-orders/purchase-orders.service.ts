@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -199,5 +199,28 @@ export class PurchaseOrdersService {
     });
 
     return this.toResponse(updated);
+  }
+
+  async deletePurchaseOrder(poId: string) {
+    await this.assertExists(poId);
+
+    // A GoodsReceivedNote references PurchaseOrder.docId with ON DELETE RESTRICT,
+    // so deleting a PO that already has a GRN would fail at the DB level anyway.
+    // Check first so we can return a clear, friendly error instead of a raw FK violation.
+    const grn = await this.prisma.goodsReceivedNote.findUnique({ where: { poId } });
+    if (grn) {
+      throw new BadRequestException(
+        'This Purchase Order already has a Goods Received Note and cannot be deleted.',
+      );
+    }
+
+    // PurchaseOrder.docId -> Document.id is also ON DELETE RESTRICT, so the
+    // PurchaseOrder row (and its items, which cascade) must go first, then Document.
+    await this.prisma.$transaction([
+      this.prisma.purchaseOrder.delete({ where: { docId: poId } }),
+      this.prisma.document.delete({ where: { id: poId } }),
+    ]);
+
+    return { success: true, id: poId };
   }
 }

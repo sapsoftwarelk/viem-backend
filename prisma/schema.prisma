@@ -234,6 +234,8 @@ model SiteLocation {
   goodsIssueNotes     GoodsIssueNote[]
   managerHistory      SiteManagerHistory[]
   purchaseOrders      PurchaseOrder[]     
+  receivedNotes GoodsReceivedNote[]   
+
 
 }
 
@@ -334,17 +336,44 @@ model PurchaseOrder {
    }
 
 model GoodsReceivedNote {
-  docId         String   @id
-  document      Document @relation(fields: [docId], references: [id])
-  poId          String   @unique
-  po            PurchaseOrder @relation(fields: [poId], references: [docId])
-  supplier      String
-  receivedDate  DateTime @default(now())
-  
-  // Generated items from this GRN
-  tools         Tool[]
-  consumables   ConsumableBatch[]
-  reusables     ReusableItem[]
+  docId          String   @id
+  poId           String?  @unique   // now optional — supports standalone GRNs ("Create GRN Without PO")
+  supplier       String
+  siteLocationId String?
+  siteLocation   SiteLocation? @relation(fields: [siteLocationId], references: [id])
+  receivedBy     String?
+  inspectedBy    String?
+  deliveryNote   String?
+  notes          String?
+  receivedDate   DateTime @default(now())
+
+  document       Document       @relation(fields: [docId], references: [id])
+  po             PurchaseOrder? @relation(fields: [poId], references: [docId])
+  items          GoodsReceivedNoteItem[]
+
+  tools          Tool[]
+  consumables    ConsumableBatch[]
+  reusables      ReusableItem[]
+}
+
+model GoodsReceivedNoteItem {
+  id                String            @id @default(uuid())
+  grnId             String
+  goodsReceivedNote GoodsReceivedNote @relation(fields: [grnId], references: [docId], onDelete: Cascade)
+
+  poLineId     String?   // the PurchaseOrderItem.id this line fulfills, if linked to a PO
+  itemId       String?   // catalog item reference (Tool/ConsumableBatch/ReusableItem id), if picked from the catalog
+  itemName     String
+  type         String?   // "Tool" | "Consumable" | "Reusable"
+  categoryCode String?
+  unit         String?
+  qtyOrdered   Float?
+  qtyReceived  Float     @default(0)  // cumulative quantity received to date for this line
+  unitPrice    Float?
+  isRegistered Boolean   @default(false)
+  condition    String?
+
+  @@index([grnId])
 }
 
 model ExpiryNote {
