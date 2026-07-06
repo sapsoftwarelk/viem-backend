@@ -250,6 +250,24 @@ model SiteManagerHistory {
   changedBy String?
 }
 
+model Supplier {
+  id            String   @id @default(uuid())
+  code          String   @unique // Format: SUP-001
+  name          String
+  contactPerson String?
+  email         String   @unique
+  phone         String
+  address       String?
+  taxId         String?  // BRN හෝ VAT වැනි දෑ සඳහා
+  status        String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  purchaseOrders     PurchaseOrder[]
+  goodsReceivedNotes GoodsReceivedNote[]
+}
+
 // ---------------------------------------------------------
 // 4. Document System (16 Types)
 // ---------------------------------------------------------
@@ -305,16 +323,17 @@ enum GINItemType {
 }
 
 model PurchaseOrder {
-     docId          String        @id
-     supplier       String
-     siteLocationId String?
-     siteLocation   SiteLocation? @relation(fields: [siteLocationId], references: [id])
-     totalCost      Float
-     expectedDate   DateTime
-     document       Document      @relation(fields: [docId], references: [id])
-     items          PurchaseOrderItem[]
-     grn            GoodsReceivedNote?
-   }
+  docId          String        @id
+  supplierId     String       
+  supplier       Supplier      @relation(fields: [supplierId], references: [id])
+  siteLocationId String?
+  siteLocation   SiteLocation? @relation(fields: [siteLocationId], references: [id])
+  totalCost      Float
+  expectedDate   DateTime
+  document       Document      @relation(fields: [docId], references: [id])
+  items          PurchaseOrderItem[]
+  grn            GoodsReceivedNote?
+}
 
    model PurchaseOrderItem {
      id            String        @id @default(uuid())
@@ -337,8 +356,9 @@ model PurchaseOrder {
 
 model GoodsReceivedNote {
   docId          String   @id
-  poId           String?  @unique   // now optional — supports standalone GRNs ("Create GRN Without PO")
-  supplier       String
+  poId           String?  @unique
+  supplierId     String       
+  supplier       Supplier      @relation(fields: [supplierId], references: [id])
   siteLocationId String?
   siteLocation   SiteLocation? @relation(fields: [siteLocationId], references: [id])
   receivedBy     String?

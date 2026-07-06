@@ -3,7 +3,6 @@
 
   - You are about to drop the `Item` table. If the table is not empty, all the data it contains will be lost.
   - A unique constraint covering the columns `[code]` on the table `SubCategory` will be added. If there are existing duplicate values, this will fail.
-  - Added the required column `code` to the `SubCategory` table without a default value. This is not possible if the table is not empty.
 
 */
 -- CreateEnum
@@ -24,30 +23,27 @@ CREATE TYPE "GINStatus" AS ENUM ('DRAFT', 'READY', 'IN_TRANSIT', 'DELIVERED', 'D
 -- CreateEnum
 CREATE TYPE "LMRStatus" AS ENUM ('LOADED', 'IN_TRANSIT', 'DELIVERED', 'RETURNING', 'RETURNED', 'CLOSED');
 
--- CreateEnum
-CREATE TYPE "TaskPriority" AS ENUM ('Low', 'Medium', 'High', 'Urgent');
-
--- CreateEnum
-CREATE TYPE "TaskStatus" AS ENUM ('Active', 'Inactive');
-
 -- DropForeignKey
 ALTER TABLE "Item" DROP CONSTRAINT "Item_subCategoryId_fkey";
-
--- AlterTable
-ALTER TABLE "SubCategory" ADD COLUMN     "code" TEXT NOT NULL;
 
 -- DropTable
 DROP TABLE "Item";
 
--- CreateTable
+-- AlterTable (SubCategory වගුවේ දත්ත පවතී නම් බිඳ වැටීම් වැළැක්වීමට මුලින් NULL කර පසුව NOT NULL කර ඇත)
+ALTER TABLE "SubCategory" ADD COLUMN "code" TEXT;
+UPDATE "SubCategory" SET "code" = 'TEMP-' || id WHERE "code" IS NULL;
+ALTER TABLE "SubCategory" ALTER COLUMN "code" SET NOT NULL;
+
+-- CreateTable: Employee
 CREATE TABLE "Employee" (
     "id" TEXT NOT NULL,
-    "fullName" TEXT NOT NULL DEFAULT '',
+    "name" TEXT NOT NULL,
     "employeeId" TEXT NOT NULL,
     "photoUrl" TEXT,
     "contact" TEXT NOT NULL,
     "department" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "employmentType" TEXT NOT NULL DEFAULT 'Permanent',
     "joinDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "roleId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,7 +51,7 @@ CREATE TABLE "Employee" (
     CONSTRAINT "Employee_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: User
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
@@ -69,10 +65,10 @@ CREATE TABLE "User" (
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: Role
 CREATE TABLE "Role" (
     "id" TEXT NOT NULL,
-    "position_title" TEXT NOT NULL DEFAULT '',
+    "position_title" TEXT NOT NULL,
     "level" TEXT NOT NULL DEFAULT '',
     "status" TEXT NOT NULL DEFAULT 'active',
     "description" TEXT NOT NULL DEFAULT '',
@@ -85,7 +81,7 @@ CREATE TABLE "Role" (
     CONSTRAINT "Role_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: Tool
 CREATE TABLE "Tool" (
     "id" TEXT NOT NULL,
     "subCategoryId" INTEGER NOT NULL,
@@ -95,7 +91,6 @@ CREATE TABLE "Tool" (
     "supplier" TEXT,
     "purchaseDate" TIMESTAMP(3),
     "warrantyExpiry" TIMESTAMP(3),
-    "quantity" INTEGER,
     "bladeType" TEXT,
     "serialNumber" TEXT NOT NULL,
     "condition" TEXT NOT NULL,
@@ -108,7 +103,7 @@ CREATE TABLE "Tool" (
     CONSTRAINT "Tool_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: Vehicle
 CREATE TABLE "Vehicle" (
     "id" TEXT NOT NULL,
     "registrationNo" TEXT NOT NULL,
@@ -122,17 +117,16 @@ CREATE TABLE "Vehicle" (
     "notes" TEXT,
     "insuranceExpiry" TIMESTAMP(3) NOT NULL,
     "registrationExpiry" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "subCategoryId" INTEGER NOT NULL,
 
     CONSTRAINT "Vehicle_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: ConsumableBatch
 CREATE TABLE "ConsumableBatch" (
     "id" TEXT NOT NULL,
     "subCategoryId" INTEGER NOT NULL,
-    "itemName" TEXT,
+    "itemName" TEXT NOT NULL,
     "description" TEXT,
     "supplier" TEXT,
     "purchaseDate" TIMESTAMP(3),
@@ -142,40 +136,65 @@ CREATE TABLE "ConsumableBatch" (
     "quantity" DOUBLE PRECISION NOT NULL,
     "unit" TEXT,
     "status" "ConsumableBatchStatus" NOT NULL DEFAULT 'AVAILABLE',
-    "locationId" TEXT,
     "originalBatchId" TEXT,
+    "locationId" TEXT,
     "grnId" TEXT,
 
     CONSTRAINT "ConsumableBatch_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: ReusableItem
 CREATE TABLE "ReusableItem" (
     "id" TEXT NOT NULL,
-    "bundleId" TEXT NOT NULL,
     "itemName" TEXT,
+    "subCategoryId" INTEGER,
+    "bundleId" TEXT NOT NULL,
     "description" TEXT,
     "supplier" TEXT,
     "purchaseDate" TIMESTAMP(3),
     "status" TEXT,
     "locationId" TEXT,
-    "pieceCount" INTEGER,
-    "individualTracking" BOOLEAN DEFAULT false,
     "pieceNum" INTEGER NOT NULL,
+    "individualTracking" BOOLEAN DEFAULT false,
     "grnId" TEXT,
 
     CONSTRAINT "ReusableItem_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: SiteLocation
 CREATE TABLE "SiteLocation" (
     "id" TEXT NOT NULL,
     "siteName" TEXT NOT NULL,
+    "manager" TEXT NOT NULL DEFAULT '',
+    "region" TEXT NOT NULL DEFAULT '',
+    "seq" INTEGER NOT NULL DEFAULT 1,
+    "status" TEXT NOT NULL DEFAULT 'Planning',
+    "client" TEXT NOT NULL DEFAULT '',
+    "contactNumber" TEXT NOT NULL DEFAULT '',
+    "address" TEXT NOT NULL DEFAULT '',
+    "startDate" TIMESTAMP(3),
+    "remarks" TEXT NOT NULL DEFAULT '',
+    "subLevels" JSONB NOT NULL DEFAULT '[]',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "SiteLocation_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: SiteManagerHistory
+CREATE TABLE "SiteManagerHistory" (
+    "id" TEXT NOT NULL,
+    "siteId" TEXT NOT NULL,
+    "manager" TEXT NOT NULL,
+    "fromDate" TIMESTAMP(3) NOT NULL,
+    "toDate" TIMESTAMP(3),
+    "changedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "changedBy" TEXT,
+
+    CONSTRAINT "SiteManagerHistory_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable: Document
 CREATE TABLE "Document" (
     "id" TEXT NOT NULL,
     "type" "DocType" NOT NULL,
@@ -187,27 +206,81 @@ CREATE TABLE "Document" (
     CONSTRAINT "Document_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: Task
+CREATE TABLE "Task" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "priority" TEXT NOT NULL DEFAULT 'Medium',
+    "status" TEXT DEFAULT 'active',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Task_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable: PurchaseOrder
 CREATE TABLE "PurchaseOrder" (
     "docId" TEXT NOT NULL,
     "supplier" TEXT NOT NULL,
+    "siteLocationId" TEXT,
     "totalCost" DOUBLE PRECISION NOT NULL,
     "expectedDate" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PurchaseOrder_pkey" PRIMARY KEY ("docId")
 );
 
--- CreateTable
+-- CreateTable: PurchaseOrderItem
+CREATE TABLE "PurchaseOrderItem" (
+    "id" TEXT NOT NULL,
+    "poId" TEXT NOT NULL,
+    "itemId" TEXT,
+    "description" TEXT NOT NULL,
+    "type" TEXT,
+    "categoryCode" TEXT,
+    "unit" TEXT,
+    "quantity" DOUBLE PRECISION NOT NULL,
+    "receivedQty" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "unitPrice" DOUBLE PRECISION NOT NULL,
+    "subCategoryId" INTEGER,
+
+    CONSTRAINT "PurchaseOrderItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable: GoodsReceivedNote
 CREATE TABLE "GoodsReceivedNote" (
     "docId" TEXT NOT NULL,
-    "poId" TEXT NOT NULL,
+    "poId" TEXT,
     "supplier" TEXT NOT NULL,
+    "siteLocationId" TEXT,
+    "receivedBy" TEXT,
+    "inspectedBy" TEXT,
+    "deliveryNote" TEXT,
+    "notes" TEXT,
     "receivedDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "GoodsReceivedNote_pkey" PRIMARY KEY ("docId")
 );
 
--- CreateTable
+-- CreateTable: GoodsReceivedNoteItem
+CREATE TABLE "GoodsReceivedNoteItem" (
+    "id" TEXT NOT NULL,
+    "grnId" TEXT NOT NULL,
+    "poLineId" TEXT,
+    "itemId" TEXT,
+    "itemName" TEXT NOT NULL,
+    "type" TEXT,
+    "categoryCode" TEXT,
+    "unit" TEXT,
+    "qtyOrdered" DOUBLE PRECISION,
+    "qtyReceived" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "unitPrice" DOUBLE PRECISION,
+    "isRegistered" BOOLEAN NOT NULL DEFAULT false,
+    "condition" TEXT,
+
+    CONSTRAINT "GoodsReceivedNoteItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable: ExpiryNote
 CREATE TABLE "ExpiryNote" (
     "docId" TEXT NOT NULL,
     "batchId" TEXT NOT NULL,
@@ -217,7 +290,7 @@ CREATE TABLE "ExpiryNote" (
     CONSTRAINT "ExpiryNote_pkey" PRIMARY KEY ("docId")
 );
 
--- CreateTable
+-- CreateTable: GoodsIssueNote
 CREATE TABLE "GoodsIssueNote" (
     "docId" TEXT NOT NULL,
     "status" "GINStatus" NOT NULL DEFAULT 'DRAFT',
@@ -233,7 +306,7 @@ CREATE TABLE "GoodsIssueNote" (
     CONSTRAINT "GoodsIssueNote_pkey" PRIMARY KEY ("docId")
 );
 
--- CreateTable
+-- CreateTable: LorryMovementRecord
 CREATE TABLE "LorryMovementRecord" (
     "id" TEXT NOT NULL,
     "vehicleId" TEXT NOT NULL,
@@ -250,7 +323,7 @@ CREATE TABLE "LorryMovementRecord" (
     CONSTRAINT "LorryMovementRecord_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: GoodsIssueNoteItem
 CREATE TABLE "GoodsIssueNoteItem" (
     "id" TEXT NOT NULL,
     "ginId" TEXT NOT NULL,
@@ -269,7 +342,7 @@ CREATE TABLE "GoodsIssueNoteItem" (
     CONSTRAINT "GoodsIssueNoteItem_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: MaintenanceRecord
 CREATE TABLE "MaintenanceRecord" (
     "id" TEXT NOT NULL,
     "toolId" TEXT NOT NULL,
@@ -280,7 +353,7 @@ CREATE TABLE "MaintenanceRecord" (
     CONSTRAINT "MaintenanceRecord_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
+-- CreateTable: MovementHistory
 CREATE TABLE "MovementHistory" (
     "id" TEXT NOT NULL,
     "toolId" TEXT NOT NULL,
@@ -290,132 +363,78 @@ CREATE TABLE "MovementHistory" (
     CONSTRAINT "MovementHistory_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "Task" (
-    "id" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "description" TEXT,
-    "priority" "TaskPriority" NOT NULL DEFAULT 'Medium',
-    "status" "TaskStatus" NOT NULL DEFAULT 'Active',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "Task_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "Employee_employeeId_key" ON "Employee"("employeeId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
-
--- CreateIndex
 CREATE UNIQUE INDEX "User_employeeId_key" ON "User"("employeeId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Role_position_title_key" ON "Role"("position_title");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Tool_serialNumber_key" ON "Tool"("serialNumber");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Vehicle_registrationNo_key" ON "Vehicle"("registrationNo");
-
--- CreateIndex
 CREATE UNIQUE INDEX "GoodsReceivedNote_poId_key" ON "GoodsReceivedNote"("poId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "SubCategory_code_key" ON "SubCategory"("code");
+CREATE INDEX "PurchaseOrderItem_poId_idx" ON "PurchaseOrderItem"("poId");
+CREATE INDEX "GoodsReceivedNoteItem_grnId_idx" ON "GoodsReceivedNoteItem"("grnId");
 
 -- AddForeignKey
 ALTER TABLE "Employee" ADD CONSTRAINT "Employee_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_employeeId_fkey" FOREIGN KEY ("employeeId") REFERENCES "Employee"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
+-- Tool Relations
 ALTER TABLE "Tool" ADD CONSTRAINT "Tool_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "SubCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Tool" ADD CONSTRAINT "Tool_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Tool" ADD CONSTRAINT "Tool_grnId_fkey" FOREIGN KEY ("grnId") REFERENCES "GoodsReceivedNote"("docId") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
+-- Vehicle Relations
+ALTER TABLE "Vehicle" ADD CONSTRAINT "Vehicle_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "SubCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Consumable Relations
 ALTER TABLE "ConsumableBatch" ADD CONSTRAINT "ConsumableBatch_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "SubCategory"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "ConsumableBatch" ADD CONSTRAINT "ConsumableBatch_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "ConsumableBatch" ADD CONSTRAINT "ConsumableBatch_grnId_fkey" FOREIGN KEY ("grnId") REFERENCES "GoodsReceivedNote"("docId") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
+-- Reusable Relations
+ALTER TABLE "ReusableItem" ADD CONSTRAINT "ReusableItem_subCategoryId_fkey" FOREIGN KEY ("subCategoryId") REFERENCES "SubCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "ReusableItem" ADD CONSTRAINT "ReusableItem_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "ReusableItem" ADD CONSTRAINT "ReusableItem_grnId_fkey" FOREIGN KEY ("grnId") REFERENCES "GoodsReceivedNote"("docId") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
+-- SiteManagerHistory Relations
+ALTER TABLE "SiteManagerHistory" ADD CONSTRAINT "SiteManagerHistory_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "SiteLocation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Document & PO Relations
 ALTER TABLE "Document" ADD CONSTRAINT "Document_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_docId_fkey" FOREIGN KEY ("docId") REFERENCES "Document"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PurchaseOrder" ADD CONSTRAINT "PurchaseOrder_siteLocationId_fkey" FOREIGN KEY ("siteLocationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "PurchaseOrderItem" ADD CONSTRAINT "PurchaseOrderItem_poId_fkey" FOREIGN KEY ("poId") REFERENCES "PurchaseOrder"("docId") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
+-- GRN Relations
 ALTER TABLE "GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_docId_fkey" FOREIGN KEY ("docId") REFERENCES "Document"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_poId_fkey" FOREIGN KEY ("poId") REFERENCES "PurchaseOrder"("docId") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_siteLocationId_fkey" FOREIGN KEY ("siteLocationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "GoodsReceivedNoteItem" ADD CONSTRAINT "GoodsReceivedNoteItem_grnId_fkey" FOREIGN KEY ("grnId") REFERENCES "GoodsReceivedNote"("docId") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "GoodsReceivedNote" ADD CONSTRAINT "GoodsReceivedNote_poId_fkey" FOREIGN KEY ("poId") REFERENCES "PurchaseOrder"("docId") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
+-- Expiry Relations
 ALTER TABLE "ExpiryNote" ADD CONSTRAINT "ExpiryNote_docId_fkey" FOREIGN KEY ("docId") REFERENCES "Document"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "ExpiryNote" ADD CONSTRAINT "ExpiryNote_batchId_fkey" FOREIGN KEY ("batchId") REFERENCES "ConsumableBatch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
+-- GIN Relations
 ALTER TABLE "GoodsIssueNote" ADD CONSTRAINT "GoodsIssueNote_docId_fkey" FOREIGN KEY ("docId") REFERENCES "Document"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "GoodsIssueNote" ADD CONSTRAINT "GoodsIssueNote_lmrId_fkey" FOREIGN KEY ("lmrId") REFERENCES "LorryMovementRecord"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "GoodsIssueNote" ADD CONSTRAINT "GoodsIssueNote_siteLocationId_fkey" FOREIGN KEY ("siteLocationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
+-- LMR Relations
 ALTER TABLE "LorryMovementRecord" ADD CONSTRAINT "LorryMovementRecord_id_fkey" FOREIGN KEY ("id") REFERENCES "Document"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "LorryMovementRecord" ADD CONSTRAINT "LorryMovementRecord_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "LorryMovementRecord" ADD CONSTRAINT "LorryMovementRecord_driverId_fkey" FOREIGN KEY ("driverId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "LorryMovementRecord" ADD CONSTRAINT "LorryMovementRecord_originLocationId_fkey" FOREIGN KEY ("originLocationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "LorryMovementRecord" ADD CONSTRAINT "LorryMovementRecord_destinationLocationId_fkey" FOREIGN KEY ("destinationLocationId") REFERENCES "SiteLocation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
+-- GIN Item Relations
 ALTER TABLE "GoodsIssueNoteItem" ADD CONSTRAINT "GoodsIssueNoteItem_ginId_fkey" FOREIGN KEY ("ginId") REFERENCES "GoodsIssueNote"("docId") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "GoodsIssueNoteItem" ADD CONSTRAINT "GoodsIssueNoteItem_toolId_fkey" FOREIGN KEY ("toolId") REFERENCES "Tool"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "GoodsIssueNoteItem" ADD CONSTRAINT "GoodsIssueNoteItem_reusableId_fkey" FOREIGN KEY ("reusableId") REFERENCES "ReusableItem"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "GoodsIssueNoteItem" ADD CONSTRAINT "GoodsIssueNoteItem_consumableId_fkey" FOREIGN KEY ("consumableId") REFERENCES "ConsumableBatch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
+-- History & Maintenance Relations
 ALTER TABLE "MaintenanceRecord" ADD CONSTRAINT "MaintenanceRecord_toolId_fkey" FOREIGN KEY ("toolId") REFERENCES "Tool"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "MovementHistory" ADD CONSTRAINT "MovementHistory_toolId_fkey" FOREIGN KEY ("toolId") REFERENCES "Tool"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
