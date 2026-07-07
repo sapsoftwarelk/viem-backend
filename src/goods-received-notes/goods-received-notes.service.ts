@@ -5,11 +5,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class GoodsReceivedNotesService {
   constructor(private prisma: PrismaService) {}
 
-  // 1. Goods Received Note (GRN) එකක් නිර්මාණය කිරීම
   async create(data: {
     docId: string;
     poId?: string | null;
-    supplierId: string; // 👈 පැරණි 'supplier' වෙනුවට නව 'supplierId' අනිවාර්ය කර ඇත
+    supplierId: string; 
     siteLocationId?: string | null;
     receivedBy?: string | null;
     inspectedBy?: string | null;
@@ -30,13 +29,12 @@ export class GoodsReceivedNotesService {
       condition?: string | null;
     }[];
   }) {
-    // Transaction එකක් භාවිතයෙන් GRN එක සහ එහි අයිතම (Items) එකවර සුරැකීම
     return this.prisma.$transaction(async (tx) => {
       const grn = await tx.goodsReceivedNote.create({
         data: {
           docId: data.docId,
           poId: data.poId || null,
-          supplierId: data.supplierId, // 👈 Relation එක නිවැරදිව Map කිරීම
+          supplierId: data.supplierId, 
           siteLocationId: data.siteLocationId || null,
           receivedBy: data.receivedBy || null,
           inspectedBy: data.inspectedBy || null,
@@ -46,7 +44,6 @@ export class GoodsReceivedNotesService {
         },
       });
 
-      // GRN එකට අදාළ බිල්පත් අයිතම (Items) සියල්ල නිර්මාණය කිරීම
       if (data.items && data.items.length > 0) {
         await tx.goodsReceivedNoteItem.createMany({
           data: data.items.map((item) => ({
@@ -68,17 +65,16 @@ export class GoodsReceivedNotesService {
 
       return tx.goodsReceivedNote.findUnique({
         where: { docId: grn.docId },
-        include: { items: true, supplier: true }, // Supplier විස්තර ද සමඟින් ලබා දීම
+        include: { items: true, supplier: true }, 
       });
     });
   }
 
-  // 2. සියලුම GRN වාර්තා ලබා ගැනීම
   async findAll() {
     return this.prisma.goodsReceivedNote.findMany({
       include: {
         items: true,
-        supplier: true, // 👈 Supplier සම්බන්ධතාවය Fetch කිරීම
+        supplier: true,
       },
       orderBy: {
         receivedDate: 'desc',
@@ -86,13 +82,12 @@ export class GoodsReceivedNotesService {
     });
   }
 
-  // 3. නිශ්චිත ID එකක් අනුව එක් GRN වාර්තාවක් ලබා ගැනීම
   async findOne(id: string) {
     const grn = await this.prisma.goodsReceivedNote.findUnique({
       where: { docId: id },
       include: {
         items: true,
-        supplier: true, // 👈 Supplier සම්බන්ධතාවය Fetch කිරීම
+        supplier: true, 
       },
     });
 
@@ -103,12 +98,11 @@ export class GoodsReceivedNotesService {
     return grn;
   }
 
-  // 4. GRN වාර්තාවක් යාවත්කාලීන කිරීම (Update)
   async update(
     id: string,
     data: {
       poId?: string | null;
-      supplierId?: string; // 👈 Optional කර ඇත
+      supplierId?: string;
       siteLocationId?: string | null;
       receivedBy?: string | null;
       inspectedBy?: string | null;
@@ -117,14 +111,13 @@ export class GoodsReceivedNotesService {
       receivedDate?: Date;
     },
   ) {
-    // පවතින GRN එක පරීක්ෂා කිරීම
     await this.findOne(id);
 
     return this.prisma.goodsReceivedNote.update({
       where: { docId: id },
       data: {
         poId: data.poId === undefined ? undefined : data.poId,
-        supplierId: data.supplierId, // 👈 'supplier' වෙනුවට 'supplierId' යාවත්කාලීන කිරීම
+        supplierId: data.supplierId, 
         siteLocationId: data.siteLocationId === undefined ? undefined : data.siteLocationId,
         receivedBy: data.receivedBy === undefined ? undefined : data.receivedBy,
         inspectedBy: data.inspectedBy === undefined ? undefined : data.inspectedBy,
@@ -139,11 +132,9 @@ export class GoodsReceivedNotesService {
     });
   }
 
-  // 5. GRN වාර්තාවක් පද්ධතියෙන් ඉවත් කිරීම (Delete)
   async remove(id: string) {
     await this.findOne(id);
 
-    // Cascade Delete සක්‍රීය කර නොමැති නම් ප්‍රථමයෙන් Items මැකිය යුතුය
     await this.prisma.goodsReceivedNoteItem.deleteMany({
       where: { grnId: id },
     });
