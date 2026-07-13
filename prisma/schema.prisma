@@ -236,6 +236,13 @@ model SiteLocation {
   purchaseOrders      PurchaseOrder[]     
   receivedNotes GoodsReceivedNote[]   
 
+  // Transfer / Return / Repair note relations (both directions named to
+  // disambiguate multiple FKs pointing at the same model)
+  transfersFrom  TransferNote[] @relation("TransferFromLocation")
+  transfersTo    TransferNote[] @relation("TransferToLocation")
+  returnsFrom    ReturnNote[]   @relation("ReturnFromLocation")
+  returnsTo      ReturnNote[]   @relation("ReturnToLocation")
+  repairNotes    RepairNote[]
 
 }
 
@@ -505,4 +512,91 @@ model MovementHistory {
   tool      Tool     @relation(fields: [toolId], references: [id])
   location  String
   timestamp DateTime @default(now())
+}
+// ---------------------------------------------------------
+// 6. Transfer / Return / Repair Notes
+// ---------------------------------------------------------
+// NOTE: fromSiteId/toSiteId/siteId are plain strings, not FKs — sub-levels
+// live inside SiteLocation.subLevels (Json), so there's no dedicated Site
+// table to reference. fromLocationId/toLocationId/locationId DO reference
+// SiteLocation directly.
+
+model TransferNote {
+  id             String    @id // Format: TRN-0001
+  fromLocationId String?
+  fromLocation   SiteLocation? @relation("TransferFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  fromSiteId     String?
+  toLocationId   String?
+  toLocation     SiteLocation? @relation("TransferToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+  toSiteId       String?
+  transferDate   DateTime  @default(now())
+  remarks        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  items          TransferNoteItem[]
+}
+
+model TransferNoteItem {
+  id             String       @id @default(uuid())
+  transferNoteId String
+  transferNote   TransferNote @relation(fields: [transferNoteId], references: [id], onDelete: Cascade)
+  itemId         String?      // optional catalog item reference (Tool/ConsumableBatch/ReusableItem id)
+  itemName       String
+  quantity       Float
+
+  @@index([transferNoteId])
+}
+
+model ReturnNote {
+  id             String    @id // Format: RTN-0001
+  fromLocationId String?
+  fromLocation   SiteLocation? @relation("ReturnFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  fromSiteId     String?
+  toLocationId   String?
+  toLocation     SiteLocation? @relation("ReturnToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+  toSiteId       String?
+  returnDate     DateTime  @default(now())
+  remarks        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  items          ReturnNoteItem[]
+}
+
+model ReturnNoteItem {
+  id           String     @id @default(uuid())
+  returnNoteId String
+  returnNote   ReturnNote @relation(fields: [returnNoteId], references: [id], onDelete: Cascade)
+  itemId       String?
+  itemName     String
+  quantity     Float
+
+  @@index([returnNoteId])
+}
+
+model RepairNote {
+  id                  String    @id // Format: RPN-0001
+  locationId          String?
+  location            SiteLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  siteId              String?
+  vendor              String
+  repairStatus        String    @default("Pending") // Pending | In Progress | Completed | Returned | Cancelled
+  expectedReturnDate  DateTime?
+  remarks             String?
+  createdDate         DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  items               RepairNoteItem[]
+}
+
+model RepairNoteItem {
+  id           String     @id @default(uuid())
+  repairNoteId String
+  repairNote   RepairNote @relation(fields: [repairNoteId], references: [id], onDelete: Cascade)
+  itemId       String?
+  itemName     String
+  quantity     Float
+
+  @@index([repairNoteId])
 }

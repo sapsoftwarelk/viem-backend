@@ -16,6 +16,9 @@ import { VehiclesModule } from './vehicles/vehicles.module';
 import { SiteLocationsModule } from './site-locations/site-locations.module';
 import { FrontendFallbacksModule } from './frontend-fallbacks/frontend-fallbacks.module';
 import { SupplierModule } from './supplier/supplier.module';
+import { TransferNotesModule } from './transfer-notes/Transfer notes.module';
+import { ReturnNotesModule } from './return-notes/Return notes.module';
+import { RepairNotesModule } from './repair-notes/Repair notes.module ';
 
 @Module({
   imports: [
@@ -38,6 +41,9 @@ import { SupplierModule } from './supplier/supplier.module';
     SiteLocationsModule,
     FrontendFallbacksModule,
     SupplierModule,
+    TransferNotesModule,
+    ReturnNotesModule,
+    RepairNotesModule,
   ],
 })
 export class AppModule {}
