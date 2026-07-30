@@ -12,7 +12,7 @@ export class GoodsReceivedNotesController {
     @Request() req,
     @Body()
     createData: {
-      docId: string;
+      docId?: string;
       poId?: string | null;
       supplierId: string; 
       siteLocationId?: string | null;
@@ -37,7 +37,7 @@ export class GoodsReceivedNotesController {
     },
   ) {
    
-    return this.grnService.create(createData);
+    return this.grnService.create(createData, req.user.id);
   }
 
   @Get()

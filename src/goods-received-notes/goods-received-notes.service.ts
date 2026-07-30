@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -6,7 +6,7 @@ export class GoodsReceivedNotesService {
   constructor(private prisma: PrismaService) {}
 
   async create(data: {
-    docId: string;
+    docId?: string;
     poId?: string | null;
     supplierId: string; 
     siteLocationId?: string | null;
@@ -28,13 +28,54 @@ export class GoodsReceivedNotesService {
       isRegistered?: boolean;
       condition?: string | null;
     }[];
-  }) {
+  }, creatorId: string) {
     return this.prisma.$transaction(async (tx) => {
+      const docId =
+        typeof data.docId === 'string' && data.docId.trim() !== ''
+          ? data.docId.trim()
+          : `GRN-${Date.now()}`;
+
+      let supplierId =
+        typeof data.supplierId === 'string' ? data.supplierId.trim() : '';
+
+      if (data.poId) {
+        const po = await tx.purchaseOrder.findUnique({
+          where: { docId: data.poId },
+          select: { supplierId: true },
+        });
+        if (!po) {
+          throw new NotFoundException(`Purchase Order with ID ${data.poId} not found.`);
+        }
+        supplierId = po.supplierId;
+      }
+
+      if (!supplierId) {
+        throw new BadRequestException('A supplier must be selected for a standalone GRN.');
+      }
+
+      const supplier = await tx.supplier.findUnique({
+        where: { id: supplierId },
+        select: { id: true },
+      });
+      if (!supplier) {
+        throw new BadRequestException('The selected supplier no longer exists. Please select another supplier.');
+      }
+
+      await tx.document.create({
+        data: {
+          id: docId,
+          type: 'GRN',
+          status: 'PENDING',
+          isAdminApproved: false,
+          creatorId,
+        },
+      });
+
       const grn = await tx.goodsReceivedNote.create({
         data: {
-          docId: data.docId,
+          docId,
           poId: data.poId || null,
-          supplierId: data.supplierId, 
+          supplierId,
           siteLocationId: data.siteLocationId || null,
           receivedBy: data.receivedBy || null,
           inspectedBy: data.inspectedBy || null,
