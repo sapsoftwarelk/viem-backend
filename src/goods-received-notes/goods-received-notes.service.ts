@@ -34,6 +34,11 @@ export class GoodsReceivedNotesService {
         typeof data.docId === 'string' && data.docId.trim() !== ''
           ? data.docId.trim()
           : `GRN-${Date.now()}`;
+      const receivedDate = data.receivedDate ? new Date(data.receivedDate) : new Date();
+
+      if (Number.isNaN(receivedDate.getTime())) {
+        throw new BadRequestException('Received date must be a valid date.');
+      }
 
       let supplierId =
         typeof data.supplierId === 'string' ? data.supplierId.trim() : '';
@@ -81,7 +86,7 @@ export class GoodsReceivedNotesService {
           inspectedBy: data.inspectedBy || null,
           deliveryNote: data.deliveryNote || null,
           notes: data.notes || null,
-          receivedDate: data.receivedDate || new Date(),
+          receivedDate,
         },
       });
 
