@@ -24,6 +24,9 @@ export class SubCategoriesService {
     await this.ensureDefaultCategories();
     return this.prisma.subCategory.create({
       data,
+      include: {
+        category: true,
+      },
     });
   }
 
