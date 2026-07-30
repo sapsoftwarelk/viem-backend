@@ -18,6 +18,13 @@ export class PurchaseOrdersService {
             siteName: true,
           },
         },
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
       },
     },
     creator: {
@@ -49,7 +56,8 @@ export class PurchaseOrdersService {
       isAdminApproved: po.isAdminApproved,
       createdAt: po.createdAt,
 
-      supplier: po.poDetails?.supplier ?? '',
+      supplierId: po.poDetails?.supplier?.id ?? '',
+      supplier: po.poDetails?.supplier?.name ?? '',
       siteLocationId: po.poDetails?.siteLocationId ?? '',
       site: po.poDetails?.siteLocation?.siteName ?? '',
       totalCost: po.poDetails?.totalCost ?? 0,
@@ -94,7 +102,7 @@ export class PurchaseOrdersService {
         creatorId: creatorId,
         poDetails: {
           create: {
-            supplier: dto.supplier,
+            supplierId: dto.supplierId,
             siteLocationId: dto.siteLocationId || null,
             totalCost: dto.totalCost,
             expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : new Date(),
