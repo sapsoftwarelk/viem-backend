@@ -86,6 +86,22 @@ export class PurchaseOrdersService {
   // ───────────────────────────────────────────────────────────────────────
 
   async createPurchaseOrder(dto: any, creatorId: string) {
+    const supplierId =
+      typeof dto?.supplierId === 'string' ? dto.supplierId.trim() : '';
+
+    if (!supplierId) {
+      throw new BadRequestException('A supplier must be selected before creating a purchase order.');
+    }
+
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+      select: { id: true },
+    });
+
+    if (!supplier) {
+      throw new BadRequestException('The selected supplier no longer exists. Please select another supplier.');
+    }
+
     const poId =
       typeof dto?.docId === 'string' && dto.docId.trim() !== ''
         ? dto.docId
@@ -102,7 +118,7 @@ export class PurchaseOrdersService {
         creatorId: creatorId,
         poDetails: {
           create: {
-            supplierId: dto.supplierId,
+            supplierId,
             siteLocationId: dto.siteLocationId || null,
             totalCost: dto.totalCost,
             expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : new Date(),
