@@ -1,10 +1,22 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+export type ManagerHistoryEntry = {
+  managerName: string;
+  changedAt: string;
+};
+
 export type SiteSubLevel = {
   id: string;
   name: string;
+  manager: string;
+  managerHistory: ManagerHistoryEntry[];
+  region: string;
+  seq: number;
   status: string;
+  client: string;
+  contactNumber: string;
+  address: string;
   startDate: string;
   remarks: string;
 };
@@ -19,7 +31,7 @@ export type CreateSiteLocationDto = {
   address?: string;
   startDate?: string | Date;
   remarks?: string;
-  subLevels?: SiteSubLevel[];
+  subLevels?: Partial<SiteSubLevel>[];
 };
 
 export type UpdateSiteLocationDto = Partial<CreateSiteLocationDto> & {
@@ -64,6 +76,9 @@ export class SiteLocationsService {
     const manager = data.manager?.trim() || '';
     const startDate = data.startDate ? this.parseDate(data.startDate, 'startDate') : undefined;
 
+    // Server always owns sub-level id assignment. Never trust ids sent by the client.
+    const subLevels = this.normalizeSubLevels(id, data.subLevels, []);
+
     return this.prisma.siteLocation.create({
       data: {
         id,
@@ -77,7 +92,7 @@ export class SiteLocationsService {
         address: data.address || '',
         startDate,
         remarks: data.remarks || '',
-        subLevels: data.subLevels || [],
+        subLevels: subLevels as any, // Json column
         managerHistory: manager
           ? {
               create: {
@@ -102,6 +117,14 @@ export class SiteLocationsService {
       data.manager === undefined ? undefined : data.manager.trim();
     const managerChanged =
       nextManager !== undefined && nextManager !== currentSite.manager;
+
+    const existingSubLevels = this.parseExistingSubLevels(currentSite.subLevels);
+
+    // Only touch subLevels if the caller actually sent them; otherwise leave untouched.
+    const subLevels =
+      data.subLevels !== undefined
+        ? this.normalizeSubLevels(id, data.subLevels, existingSubLevels)
+        : undefined;
 
     return this.prisma.$transaction(async (tx) => {
       if (managerChanged) {
@@ -136,7 +159,7 @@ export class SiteLocationsService {
           address: data.address,
           startDate: data.startDate ? this.parseDate(data.startDate, 'startDate') : undefined,
           remarks: data.remarks,
-          subLevels: data.subLevels,
+          subLevels: subLevels === undefined ? undefined : (subLevels as any),
         },
         include: {
           managerHistory: {
@@ -151,6 +174,96 @@ export class SiteLocationsService {
     await this.findOne(id);
     return this.prisma.siteLocation.delete({ where: { id } });
   }
+
+  // ─────────────────────────────────────────────────────────────
+  // Sub-level (Site) helpers — this is the source of truth for ids
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Takes whatever the client sent for subLevels and returns a clean,
+   * fully-populated array where every entry has a guaranteed, unique,
+   * sequential id in the form `${locationId}-SITE-##`.
+   *
+   * - Entries with a valid, already-known id (matching this location's
+   *   id pattern) keep that id, so edits to existing sites don't get
+   *   a new id every save.
+   * - Entries with a missing/invalid/foreign id (new sites, or ids the
+   *   client made up) get a fresh, never-before-used sequence number.
+   * - The id space is derived from the union of `existing` ids and the
+   *   incoming ids that validate, so deleted sites' sequence numbers
+   *   are never reused (avoids collisions when a site is deleted and
+   *   a new one is added in the same or a later request).
+   */
+  private normalizeSubLevels(
+    locationId: string,
+    incoming: Partial<SiteSubLevel>[] | undefined,
+    existing: SiteSubLevel[],
+  ): SiteSubLevel[] {
+    if (!incoming) return existing;
+
+    const idPattern = new RegExp(`^${this.escapeRegex(locationId)}-SITE-(\\d+)$`);
+
+    const seqFromId = (siteId?: string): number => {
+      if (!siteId) return 0;
+      const match = idPattern.exec(siteId);
+      return match ? parseInt(match[1], 10) : 0;
+    };
+
+    // Seed the "used" sequence set from both the current DB state and
+    // any incoming entries that already carry a valid id for this location.
+    const usedSeqs = new Set<number>();
+    for (const s of existing) {
+      const n = seqFromId(s.id);
+      if (n > 0) usedSeqs.add(n);
+    }
+    for (const s of incoming) {
+      const n = seqFromId(s.id);
+      if (n > 0) usedSeqs.add(n);
+    }
+
+    let cursor = 0;
+    const nextFreeSeq = (): number => {
+      cursor = Math.max(cursor, ...(usedSeqs.size ? [...usedSeqs] : [0]));
+      do {
+        cursor += 1;
+      } while (usedSeqs.has(cursor));
+      usedSeqs.add(cursor);
+      return cursor;
+    };
+
+    return incoming.map((s) => {
+      const validId = s.id && idPattern.test(s.id) ? s.id : undefined;
+      const id = validId || `${locationId}-SITE-${String(nextFreeSeq()).padStart(2, '0')}`;
+
+      return {
+        id,
+        name: s.name?.trim() || '',
+        manager: s.manager?.trim() || '',
+        managerHistory: Array.isArray(s.managerHistory) ? s.managerHistory : [],
+        region: s.region || '',
+        seq: s.seq ?? 1,
+        status: s.status || 'Planning',
+        client: s.client || '',
+        contactNumber: s.contactNumber || '',
+        address: s.address || '',
+        startDate: typeof s.startDate === 'string' ? s.startDate : '',
+        remarks: s.remarks || '',
+      };
+    });
+  }
+
+  private parseExistingSubLevels(raw: unknown): SiteSubLevel[] {
+    if (!Array.isArray(raw)) return [];
+    return raw as SiteSubLevel[];
+  }
+
+  private escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Location id helpers
+  // ─────────────────────────────────────────────────────────────
 
   private inferRegion(data: CreateSiteLocationDto): string {
     const candidates = [data.region, data.address, data.siteName, 'General']
