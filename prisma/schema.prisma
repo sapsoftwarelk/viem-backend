@@ -550,6 +550,18 @@ model TransferNoteItem {
 
 model ReturnNote {
   id             String    @id // Format: RTN-0001
+  // GRTN-specific fields.  The legacy location fields below are kept for the
+  // generic Return Notes screen, while these capture site-to-warehouse or
+  // site-to-supplier returns without requiring either destination to be a
+  // SiteLocation record.
+  siteId         String?
+  siteName       String?
+  subLevel       String?
+  destinationType String?
+  destinationId  String?
+  destinationName String?
+  status         String    @default("DRAFT")
+  requestedBy    String?
   fromLocationId String?
   fromLocation   SiteLocation? @relation("ReturnFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
   fromSiteId     String?
@@ -571,6 +583,10 @@ model ReturnNoteItem {
   itemId       String?
   itemName     String
   quantity     Float
+  unit         String?
+  availableStock Float?
+  reason       String?
+  condition    String?
 
   @@index([returnNoteId])
 }

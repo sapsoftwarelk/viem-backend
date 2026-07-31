@@ -3,9 +3,25 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const pad = (n: number, width = 4) => String(n).padStart(width, '0');
 
-type ItemInput = { itemId?: string; itemName: string; quantity: number };
+type ItemInput = {
+  itemId?: string;
+  itemName: string;
+  quantity: number;
+  unit?: string;
+  availableStock?: number;
+  reason?: string;
+  condition?: string;
+};
 
 export type ReturnNoteInput = {
+  siteId?: string;
+  siteName?: string;
+  subLevel?: string;
+  destinationType?: string;
+  destinationId?: string;
+  destinationName?: string;
+  status?: string;
+  requestedBy?: string;
   fromLocationId?: string;
   fromSiteId?: string;
   toLocationId?: string;
@@ -44,6 +60,14 @@ export class ReturnNotesService {
     return this.prisma.returnNote.create({
       data: {
         id,
+        siteId: data.siteId || null,
+        siteName: data.siteName || null,
+        subLevel: data.subLevel || null,
+        destinationType: data.destinationType || null,
+        destinationId: data.destinationId || null,
+        destinationName: data.destinationName || null,
+        status: data.status || 'DRAFT',
+        requestedBy: data.requestedBy || null,
         fromLocationId: data.fromLocationId || null,
         fromSiteId: data.fromSiteId || null,
         toLocationId: data.toLocationId || null,
@@ -55,6 +79,10 @@ export class ReturnNotesService {
             itemId: item.itemId || null,
             itemName: item.itemName,
             quantity: item.quantity,
+            unit: item.unit || null,
+            availableStock: item.availableStock ?? null,
+            reason: item.reason || null,
+            condition: item.condition || null,
           })),
         },
       },
@@ -73,6 +101,14 @@ export class ReturnNotesService {
       return tx.returnNote.update({
         where: { id },
         data: {
+          ...(data.siteId !== undefined && { siteId: data.siteId || null }),
+          ...(data.siteName !== undefined && { siteName: data.siteName || null }),
+          ...(data.subLevel !== undefined && { subLevel: data.subLevel || null }),
+          ...(data.destinationType !== undefined && { destinationType: data.destinationType || null }),
+          ...(data.destinationId !== undefined && { destinationId: data.destinationId || null }),
+          ...(data.destinationName !== undefined && { destinationName: data.destinationName || null }),
+          ...(data.status !== undefined && { status: data.status || 'DRAFT' }),
+          ...(data.requestedBy !== undefined && { requestedBy: data.requestedBy || null }),
           ...(data.fromLocationId !== undefined && { fromLocationId: data.fromLocationId || null }),
           ...(data.fromSiteId !== undefined && { fromSiteId: data.fromSiteId || null }),
           ...(data.toLocationId !== undefined && { toLocationId: data.toLocationId || null }),
@@ -85,6 +121,10 @@ export class ReturnNotesService {
                 itemId: item.itemId || null,
                 itemName: item.itemName,
                 quantity: item.quantity,
+                unit: item.unit || null,
+                availableStock: item.availableStock ?? null,
+                reason: item.reason || null,
+                condition: item.condition || null,
               })),
             },
           }),
