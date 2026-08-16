@@ -1,9 +1,21 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import PDFDocument from 'pdfkit';
 
 export type ManagerHistoryEntry = {
   managerName: string;
   changedAt: string;
+};
+
+export type AssignedPerson = {
+  id?: string;
+  name: string;
+};
+
+export type AssignedVehicle = {
+  id?: string;
+  vehiclePlate?: string;
+  driver?: string;
 };
 
 export type SiteSubLevel = {
@@ -19,6 +31,8 @@ export type SiteSubLevel = {
   address: string;
   startDate: string;
   remarks: string;
+  assignedPersons?: AssignedPerson[];
+  assignedVehicles?: AssignedVehicle[];
 };
 
 export type CreateSiteLocationDto = {
@@ -38,6 +52,18 @@ export type UpdateSiteLocationDto = Partial<CreateSiteLocationDto> & {
   seq?: number;
 };
 
+type PersonAssignment = {
+  locationId: string;
+  subLevelId?: string;
+  persons: { id?: string; name: string }[];
+};
+
+type VehicleAssignment = {
+  locationId: string;
+  subLevelId?: string;
+  vehicles: { id?: string; vehiclePlate?: string; driver?: string }[];
+};
+
 @Injectable()
 export class SiteLocationsService {
   constructor(private prisma: PrismaService) {}
@@ -51,6 +77,101 @@ export class SiteLocationsService {
       },
       orderBy: [{ createdAt: 'desc' }],
     });
+  }
+
+  /** Bulk-assign people to site sub-levels. Returns the updated sites. If callers
+   * want a PDF, the controller handles generating a PDF from the returned data.
+   */
+  async assignPeopleBulk(assignments: PersonAssignment[]) {
+    if (!Array.isArray(assignments) || assignments.length === 0) return { updated: 0 };
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated: any[] = [];
+      for (const a of assignments) {
+        console.log('[service.assignPeopleBulk] processing assignment', { locationId: a.locationId, subLevelId: a.subLevelId, personsCount: Array.isArray(a.persons) ? a.persons.length : 0 });
+        const site = await tx.siteLocation.findUnique({ where: { id: a.locationId } });
+        if (!site) continue;
+        const subLevels = Array.isArray(site.subLevels) ? site.subLevels : [];
+        const next = subLevels.map((sl: any) => {
+          if (!a.subLevelId || sl.id === a.subLevelId) {
+            return { ...sl, assignedPersons: a.persons };
+          }
+          return sl;
+        });
+        const saved = await tx.siteLocation.update({ where: { id: a.locationId }, data: { subLevels: next as any } });
+        console.log('[service.assignPeopleBulk] saved site', saved.id);
+        updated.push(saved);
+      }
+      return { updated: updated.length, sites: updated };
+    });
+  }
+
+  async assignVehiclesBulk(assignments: VehicleAssignment[]) {
+    if (!Array.isArray(assignments) || assignments.length === 0) return { updated: 0 };
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated: any[] = [];
+      for (const a of assignments) {
+        console.log('[service.assignVehiclesBulk] processing assignment', { locationId: a.locationId, subLevelId: a.subLevelId, vehiclesCount: Array.isArray(a.vehicles) ? a.vehicles.length : 0 });
+        const site = await tx.siteLocation.findUnique({ where: { id: a.locationId } });
+        if (!site) continue;
+        const subLevels = Array.isArray(site.subLevels) ? site.subLevels : [];
+        const next = subLevels.map((sl: any) => {
+          if (!a.subLevelId || sl.id === a.subLevelId) {
+            return { ...sl, assignedVehicles: a.vehicles };
+          }
+          return sl;
+        });
+        const saved = await tx.siteLocation.update({ where: { id: a.locationId }, data: { subLevels: next as any } });
+        console.log('[service.assignVehiclesBulk] saved site', saved.id);
+        updated.push(saved);
+      }
+      return { updated: updated.length, sites: updated };
+    });
+  }
+
+  async generatePeoplePdf(assignments: PersonAssignment[]) {
+    const doc = new PDFDocument({ margin: 40 });
+    doc.fontSize(18).text('Site People Assignments', { align: 'center' });
+    doc.moveDown(1);
+    for (const a of assignments) {
+      doc.fontSize(12).text(`Location: ${a.locationId}`);
+      if (a.subLevelId) doc.text(`Sub-level: ${a.subLevelId}`);
+      doc.moveDown(0.3);
+      if (Array.isArray(a.persons) && a.persons.length) {
+        a.persons.forEach((p, idx) => {
+          doc.fontSize(10).text(`${idx + 1}. ${p.name}${p.id ? ` (${p.id})` : ''}`);
+        });
+      } else {
+        doc.fontSize(10).text('No persons assigned');
+      }
+      doc.moveDown(0.8);
+    }
+    doc.end();
+    const buffer = await this.streamToBuffer(doc as any);
+    return buffer;
+  }
+
+  async generateVehiclesPdf(assignments: VehicleAssignment[]) {
+    const doc = new PDFDocument({ margin: 40 });
+    doc.fontSize(18).text('Site Vehicle Assignments', { align: 'center' });
+    doc.moveDown(1);
+    for (const a of assignments) {
+      doc.fontSize(12).text(`Location: ${a.locationId}`);
+      if (a.subLevelId) doc.text(`Sub-level: ${a.subLevelId}`);
+      doc.moveDown(0.3);
+      if (Array.isArray(a.vehicles) && a.vehicles.length) {
+        a.vehicles.forEach((v, idx) => {
+          doc.fontSize(10).text(`${idx + 1}. ${v.vehiclePlate || v.id || 'Unknown'}${v.driver ? ` — ${v.driver}` : ''}`);
+        });
+      } else {
+        doc.fontSize(10).text('No vehicles assigned');
+      }
+      doc.moveDown(0.8);
+    }
+    doc.end();
+    const buffer = await this.streamToBuffer(doc as any);
+    return buffer;
   }
 
   async findOne(id: string) {
@@ -193,6 +314,14 @@ export class SiteLocationsService {
    *   incoming ids that validate, so deleted sites' sequence numbers
    *   are never reused (avoids collisions when a site is deleted and
    *   a new one is added in the same or a later request).
+   * - `assignedPersons` / `assignedVehicles` are NOT part of the editable
+   *   site form and are typically never sent by the location edit UI.
+   *   To avoid silently wiping out assignments made via the dedicated
+   *   assign-people / assign-vehicles endpoints every time someone edits
+   *   a site's name, manager, etc., we carry those fields forward from
+   *   the existing record unless the caller explicitly included them in
+   *   the incoming payload (which the assign endpoints do, and a future
+   *   "edit assignments inline" UI could too).
    */
   private normalizeSubLevels(
     locationId: string,
@@ -202,6 +331,7 @@ export class SiteLocationsService {
     if (!incoming) return existing;
 
     const idPattern = new RegExp(`^${this.escapeRegex(locationId)}-SITE-(\\d+)$`);
+    const existingById = new Map(existing.map((s) => [s.id, s]));
 
     const seqFromId = (siteId?: string): number => {
       if (!siteId) return 0;
@@ -234,6 +364,7 @@ export class SiteLocationsService {
     return incoming.map((s) => {
       const validId = s.id && idPattern.test(s.id) ? s.id : undefined;
       const id = validId || `${locationId}-SITE-${String(nextFreeSeq()).padStart(2, '0')}`;
+      const prior = validId ? existingById.get(validId) : undefined;
 
       return {
         id,
@@ -248,6 +379,11 @@ export class SiteLocationsService {
         address: s.address || '',
         startDate: typeof s.startDate === 'string' ? s.startDate : '',
         remarks: s.remarks || '',
+        // Preserve unless the caller explicitly sent a value for these.
+        assignedPersons:
+          s.assignedPersons !== undefined ? s.assignedPersons : prior?.assignedPersons || [],
+        assignedVehicles:
+          s.assignedVehicles !== undefined ? s.assignedVehicles : prior?.assignedVehicles || [],
       };
     });
   }
@@ -294,6 +430,15 @@ export class SiteLocationsService {
       .replace(/[^A-Z0-9]+/g, '')
       .slice(0, 3)
       .padEnd(3, 'X');
+  }
+
+  private streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', (err) => reject(err));
+    });
   }
 
   private parseDate(value: Date | string, field: string): Date {

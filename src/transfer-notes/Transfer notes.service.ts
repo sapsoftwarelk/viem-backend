@@ -12,10 +12,14 @@ export type TransferNoteInput = {
   toSiteId?: string;
   transferDate?: string;
   remarks?: string;
+  sentBy?: string;
+  receivedBy?: string;
+  vehicleId?: string;
+  vehiclePlate?: string;
   items: ItemInput[];
 };
 
-const includeItems = { items: true };
+const includeItems = { items: true as const, vehicle: true as const };
 
 @Injectable()
 export class TransferNotesService {
@@ -48,6 +52,10 @@ export class TransferNotesService {
         fromSiteId: data.fromSiteId || null,
         toLocationId: data.toLocationId || null,
         toSiteId: data.toSiteId || null,
+        sentBy: data.sentBy || null,
+        receivedBy: data.receivedBy || null,
+        vehicleId: data.vehicleId || null,
+        vehiclePlate: data.vehiclePlate || null,
         transferDate: data.transferDate ? new Date(data.transferDate) : new Date(),
         remarks: data.remarks || null,
         items: {
@@ -82,6 +90,10 @@ export class TransferNotesService {
           ...(data.toSiteId !== undefined && { toSiteId: data.toSiteId || null }),
           ...(data.transferDate !== undefined && { transferDate: new Date(data.transferDate) }),
           ...(data.remarks !== undefined && { remarks: data.remarks || null }),
+          ...(data.sentBy !== undefined && { sentBy: data.sentBy || null }),
+          ...(data.receivedBy !== undefined && { receivedBy: data.receivedBy || null }),
+          ...(data.vehicleId !== undefined && { vehicleId: data.vehicleId || null }),
+          ...(data.vehiclePlate !== undefined && { vehiclePlate: data.vehiclePlate || null }),
           ...(data.items && {
             items: {
               create: data.items.map((item) => ({

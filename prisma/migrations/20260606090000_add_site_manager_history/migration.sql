@@ -1,4 +1,4 @@
-CREATE TABLE "SiteManagerHistory" (
+CREATE TABLE IF NOT EXISTS "SiteManagerHistory" (
     "id" TEXT NOT NULL,
     "siteId" TEXT NOT NULL,
     "manager" TEXT NOT NULL,
@@ -10,4 +10,10 @@ CREATE TABLE "SiteManagerHistory" (
     CONSTRAINT "SiteManagerHistory_pkey" PRIMARY KEY ("id")
 );
 
-ALTER TABLE "SiteManagerHistory" ADD CONSTRAINT "SiteManagerHistory_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "SiteLocation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'SiteManagerHistory_siteId_fkey') THEN
+        ALTER TABLE "SiteManagerHistory" ADD CONSTRAINT "SiteManagerHistory_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "SiteLocation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+END
+$$;

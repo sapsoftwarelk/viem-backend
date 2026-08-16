@@ -5,10 +5,10 @@
 
 */
 -- AlterTable
-ALTER TABLE "Employee" ADD COLUMN     "employmentType" TEXT NOT NULL DEFAULT 'Permanent';
+ALTER TABLE "Employee" ADD COLUMN IF NOT EXISTS     "employmentType" TEXT NOT NULL DEFAULT 'Permanent';
 
 -- AlterTable
-ALTER TABLE "SiteLocation" ADD COLUMN     "manager" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "SiteLocation" ADD COLUMN IF NOT EXISTS     "manager" TEXT NOT NULL DEFAULT '';
 
 -- AlterTable
 ALTER TABLE "Task" ALTER COLUMN "priority" SET NOT NULL,

@@ -1,16 +1,16 @@
 -- Persist the fields used by the Goods Return Note (GRTN) workflow.
-ALTER TABLE "ReturnNote"
-  ADD COLUMN "siteId" TEXT,
-  ADD COLUMN "siteName" TEXT,
-  ADD COLUMN "subLevel" TEXT,
-  ADD COLUMN "destinationType" TEXT,
-  ADD COLUMN "destinationId" TEXT,
-  ADD COLUMN "destinationName" TEXT,
-  ADD COLUMN "status" TEXT NOT NULL DEFAULT 'DRAFT',
-  ADD COLUMN "requestedBy" TEXT;
+ALTER TABLE IF EXISTS "ReturnNote"
+  ADD COLUMN IF NOT EXISTS "siteId" TEXT,
+  ADD COLUMN IF NOT EXISTS "siteName" TEXT,
+  ADD COLUMN IF NOT EXISTS "subLevel" TEXT,
+  ADD COLUMN IF NOT EXISTS "destinationType" TEXT,
+  ADD COLUMN IF NOT EXISTS "destinationId" TEXT,
+  ADD COLUMN IF NOT EXISTS "destinationName" TEXT,
+  ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'DRAFT',
+  ADD COLUMN IF NOT EXISTS "requestedBy" TEXT;
 
-ALTER TABLE "ReturnNoteItem"
-  ADD COLUMN "unit" TEXT,
-  ADD COLUMN "availableStock" DOUBLE PRECISION,
-  ADD COLUMN "reason" TEXT,
-  ADD COLUMN "condition" TEXT;
+ALTER TABLE IF EXISTS "ReturnNoteItem"
+  ADD COLUMN IF NOT EXISTS "unit" TEXT,
+  ADD COLUMN IF NOT EXISTS "availableStock" DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS "reason" TEXT,
+  ADD COLUMN IF NOT EXISTS "condition" TEXT;
