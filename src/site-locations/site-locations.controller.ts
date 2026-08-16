@@ -12,6 +12,28 @@ export class SiteLocationsController {
     return this.siteLocationsService.findAll();
   }
 
+  // NOTE: static/multi-segment routes like these are safe regardless of
+  // declaration order relative to `:id`, since Express/Nest matches by
+  // path *shape* (segment count) first — `/reports/all` and `/:id/report`
+  // both have two segments after the controller prefix, so neither is
+  // ever swallowed by the single-segment `/:id` route below.
+
+  @Get('reports/all')
+  async downloadAllLocationsReport(@Res() res: Response) {
+    const pdf = await this.siteLocationsService.generateAllLocationsReportPdf();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="site-locations-report.pdf"');
+    res.send(pdf);
+  }
+
+  @Get(':id/report')
+  async downloadLocationReport(@Param('id') id: string, @Res() res: Response) {
+    const pdf = await this.siteLocationsService.generateLocationReportPdf(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${id}-report.pdf"`);
+    res.send(pdf);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.siteLocationsService.findOne(id);

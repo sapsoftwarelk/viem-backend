@@ -174,6 +174,191 @@ export class SiteLocationsService {
     return buffer;
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Detailed reports (PDF) — full dump of a location's sites,
+  // manager history, and assignments. Used for "Download Report"
+  // on a single location, and "Download All" for every location.
+  // ─────────────────────────────────────────────────────────────
+
+  async generateLocationReportPdf(id: string): Promise<Buffer> {
+    const location = await this.findOne(id);
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+    this.writeLocationReport(doc, location);
+    this.writePageNumbers(doc);
+    doc.end();
+    return this.streamToBuffer(doc as any);
+  }
+
+  async generateAllLocationsReportPdf(): Promise<Buffer> {
+    const locations = await this.findAll();
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+
+    // Cover page
+    doc.fontSize(22).fillColor('#0f172a').text('Site Locations — Full Report', { align: 'center' });
+    doc.moveDown(0.3);
+    doc
+      .fontSize(10)
+      .fillColor('#64748b')
+      .text(`Generated on ${new Date().toLocaleString()}`, { align: 'center' });
+    doc.moveDown(1.5);
+
+    const totalSites = locations.reduce(
+      (sum: number, l: any) => sum + (Array.isArray(l.subLevels) ? l.subLevels.length : 0),
+      0,
+    );
+    doc.fontSize(12).fillColor('#334155').text(`Total Locations: ${locations.length}`);
+    doc.text(`Total Sites: ${totalSites}`);
+    doc.moveDown(1);
+
+    doc.fontSize(13).fillColor('#0f172a').text('Locations Index', { underline: true });
+    doc.moveDown(0.5);
+    locations.forEach((l: any) => {
+      const siteCount = Array.isArray(l.subLevels) ? l.subLevels.length : 0;
+      doc
+        .fontSize(10)
+        .fillColor('#334155')
+        .text(`${l.id}   —   ${l.siteName || l.name || 'Unnamed'}   (${siteCount} site${siteCount === 1 ? '' : 's'})`);
+    });
+
+    locations.forEach((location: any) => {
+      doc.addPage();
+      this.writeLocationReport(doc, location);
+    });
+
+    this.writePageNumbers(doc);
+    doc.end();
+    return this.streamToBuffer(doc as any);
+  }
+
+  /** Renders one location's full detail block (header, manager history,
+   * every site with all fields, that site's manager history, and its
+   * assigned people/vehicles) onto the current page of `doc`, adding
+   * new pages as needed if content overflows. */
+  private writeLocationReport(doc: any, location: any) {
+    const subLevels: any[] = Array.isArray(location.subLevels) ? location.subLevels : [];
+
+    doc.fontSize(18).fillColor('#0f172a').text(location.siteName || location.name || 'Unnamed Location');
+    doc.fontSize(9.5).fillColor('#64748b').text(`Location ID: ${location.id}`);
+    doc.moveDown(0.2);
+    doc
+      .fontSize(10)
+      .fillColor('#334155')
+      .text(`Region: ${location.region || '-'}      Status: ${location.status || '-'}`);
+    doc.moveDown(0.6);
+    this.drawDivider(doc);
+    doc.moveDown(0.5);
+
+    if (location.manager) {
+      doc.fontSize(11).fillColor('#0f172a').text(`Location Manager: ${location.manager}`);
+      const history = Array.isArray(location.managerHistory) ? location.managerHistory : [];
+      if (history.length) {
+        doc.moveDown(0.15);
+        doc.fontSize(9).fillColor('#64748b').text('Manager History:');
+        history.forEach((h: any) => {
+          const from = h.fromDate ? new Date(h.fromDate).toLocaleDateString() : '-';
+          const to = h.toDate ? new Date(h.toDate).toLocaleDateString() : 'Present';
+          doc.fontSize(9).fillColor('#475569').text(`   •  ${h.manager}   (${from} → ${to})`);
+        });
+      }
+      doc.moveDown(0.7);
+    }
+
+    doc.fontSize(13).fillColor('#0f172a').text(`Sites (${subLevels.length})`, { underline: true });
+    doc.moveDown(0.5);
+
+    if (subLevels.length === 0) {
+      doc.fontSize(10).fillColor('#94a3b8').text('No sites recorded for this location.');
+      return;
+    }
+
+    const row = (label: string, value: any) => {
+      doc
+        .fontSize(9.5)
+        .fillColor('#334155')
+        .text(`${label}: `, { continued: true })
+        .fillColor('#0f172a')
+        .text(`${value ?? '-'}`);
+    };
+
+    subLevels.forEach((site: any, idx: number) => {
+      // Keep a single site's record from being awkwardly split across
+      // pages — start a fresh page if we're close to the bottom margin.
+      if (doc.y > 660) doc.addPage();
+
+      doc.fontSize(12).fillColor('#0f172a').text(`${idx + 1}. ${site.name || 'Unnamed Site'}`);
+      doc.fontSize(9).fillColor('#64748b').text(`Site ID: ${site.id || '-'}`);
+      doc.moveDown(0.25);
+
+      row('Status', site.status);
+      row('Client', site.client);
+      row('Site Manager', site.manager);
+      row('Contact Number', site.contactNumber);
+      row('Address', site.address);
+      row('Start Date', site.startDate ? new Date(site.startDate).toLocaleDateString() : '-');
+      if (site.remarks) row('Remarks', site.remarks);
+
+      const managerHistory = Array.isArray(site.managerHistory) ? site.managerHistory : [];
+      if (managerHistory.length) {
+        doc.moveDown(0.2);
+        doc.fontSize(9).fillColor('#64748b').text('Previous Site Managers:');
+        managerHistory.forEach((h: any) => {
+          doc.fontSize(9).fillColor('#475569').text(`   •  ${h.managerName}   (${h.changedAt})`);
+        });
+      }
+
+      const persons = Array.isArray(site.assignedPersons) ? site.assignedPersons : [];
+      if (persons.length) {
+        doc.moveDown(0.2);
+        doc.fontSize(9).fillColor('#1d4ed8').text(`Assigned People (${persons.length}):`);
+        persons.forEach((p: any) => {
+          doc.fontSize(9).fillColor('#334155').text(`   •  ${p.name}${p.id ? `   (${p.id})` : ''}`);
+        });
+      }
+
+      const vehicles = Array.isArray(site.assignedVehicles) ? site.assignedVehicles : [];
+      if (vehicles.length) {
+        doc.moveDown(0.2);
+        doc.fontSize(9).fillColor('#7c3aed').text(`Assigned Vehicles (${vehicles.length}):`);
+        vehicles.forEach((v: any) => {
+          doc
+            .fontSize(9)
+            .fillColor('#334155')
+            .text(`   •  ${v.vehiclePlate || v.id || 'Unknown'}${v.driver ? `   — Driver: ${v.driver}` : ''}`);
+        });
+      }
+
+      doc.moveDown(0.6);
+      if (idx < subLevels.length - 1) {
+        this.drawDivider(doc);
+        doc.moveDown(0.6);
+      }
+    });
+  }
+
+  private drawDivider(doc: any) {
+    const y = doc.y;
+    doc.save();
+    doc.strokeColor('#e2e8f0').lineWidth(1).moveTo(40, y).lineTo(555, y).stroke();
+    doc.restore();
+  }
+
+  /** Stamps "Page X of Y" in the footer of every page once the full
+   * document has been laid out (requires bufferPages: true). */
+  private writePageNumbers(doc: any) {
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      const bottom = doc.page.height - 30;
+      doc
+        .fontSize(8)
+        .fillColor('#94a3b8')
+        .text(`Page ${i + 1 - range.start} of ${range.count}`, 40, bottom, {
+          width: doc.page.width - 80,
+          align: 'center',
+        });
+    }
+  }
+
   async findOne(id: string) {
     const site = await this.prisma.siteLocation.findUnique({
       where: { id },
