@@ -19,6 +19,7 @@ import { SupplierModule } from './supplier/supplier.module';
 import { TransferNotesModule } from './transfer-notes/Transfer notes.module';
 import { ReturnNotesModule } from './return-notes/Return notes.module';
 import { RepairNotesModule } from './repair-notes/Repair notes.module ';
+import { ResourceAllocationsModule } from './resource-allocations/resource-allocations.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { RepairNotesModule } from './repair-notes/Repair notes.module ';
     TransferNotesModule,
     ReturnNotesModule,
     RepairNotesModule,
+    ResourceAllocationsModule,
   ],
 })
 export class AppModule {}

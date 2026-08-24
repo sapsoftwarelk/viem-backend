@@ -244,6 +244,7 @@ model SiteLocation {
   returnsFrom    ReturnNote[]   @relation("ReturnFromLocation")
   returnsTo      ReturnNote[]   @relation("ReturnToLocation")
   repairNotes    RepairNote[]
+  allocations     ResourceAllocation[]
 
 }
 
@@ -541,6 +542,48 @@ model TransferNote {
   updatedAt      DateTime  @updatedAt
 
   items          TransferNoteItem[]
+}
+
+// ---------------------------------------------------------
+// 7. Runtime Resource Allocation (Daily Allocation Matrix)
+// ---------------------------------------------------------
+
+enum ResourceType {
+  EMPLOYEE
+  VEHICLE
+}
+
+enum AllocationStatus {
+  IDLE
+  ACTIVE
+  REPAIR
+  ABSENT
+}
+
+model ResourceAllocation {
+  id           String          @id @default(uuid())
+  resourceId   String
+  resourceType ResourceType
+  status       AllocationStatus @default(IDLE)
+  locationId   String?
+  location     SiteLocation?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  siteSubId    String?          // sub-level id inside SiteLocation.subLevels
+  updatedBy    String?
+  updatedAt    DateTime         @updatedAt
+
+  @@unique([resourceId, resourceType])
+  @@index([locationId])
+}
+
+model ResourceAllocationHistory {
+  id           String    @id @default(uuid())
+  resourceId   String
+  resourceType ResourceType
+  status       AllocationStatus
+  locationId   String?
+  siteSubId    String?
+  updatedBy    String?
+  createdAt    DateTime  @default(now())
 }
 
 model TransferNoteItem {
